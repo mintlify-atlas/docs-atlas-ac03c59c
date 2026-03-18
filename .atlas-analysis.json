@@ -1,0 +1,152 @@
+{
+  "projectType": "framework",
+  "projectName": "MorJS",
+  "projectDescription": "A cross-platform mini-program development framework based on WeChat/Alipay DSL that compiles a single codebase to WeChat, Alipay, Baidu, ByteDance, QQ, Kuaishou, Taobao, DingTalk mini-programs, and Web apps.",
+  "theme": "palm",
+  "primaryColor": "#04befb",
+  "lightColor": "#0b94bc",
+  "darkColor": null,
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Introduction",
+            "pages": [
+              "introduction/overview",
+              "introduction/architecture",
+              "introduction/getting-started"
+            ]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "concepts/multi-platform",
+              "concepts/dsl-support",
+              "concepts/compile-modes",
+              "concepts/compile-types",
+              "concepts/runtime"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "guides/installation",
+              "guides/project-setup",
+              "guides/configuration",
+              "guides/compile-targets",
+              "guides/web-compilation",
+              "guides/subpackages",
+              "guides/plugins"
+            ]
+          },
+          {
+            "group": "Advanced",
+            "pages": [
+              "advanced/plugin-development",
+              "advanced/custom-compiler-plugins",
+              "advanced/module-sharing",
+              "advanced/conditional-compile",
+              "advanced/css-class-compression",
+              "advanced/phantom-dependency"
+            ]
+          },
+          {
+            "group": "Migration",
+            "pages": [
+              "migration/wechat-to-alipay",
+              "migration/alipay-to-wechat"
+            ]
+          },
+          {
+            "group": "Community",
+            "pages": [
+              "community/contributing",
+              "community/changelog"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "CLI",
+            "pages": [
+              "api/cli/overview",
+              "api/cli/compile",
+              "api/cli/compose"
+            ]
+          },
+          {
+            "group": "Configuration",
+            "pages": [
+              "api/config/mor-config",
+              "api/config/compiler-options",
+              "api/config/web-options"
+            ]
+          },
+          {
+            "group": "Runtime API",
+            "pages": [
+              "api/runtime/app",
+              "api/runtime/page",
+              "api/runtime/component",
+              "api/runtime/plugin"
+            ]
+          },
+          {
+            "group": "Packages",
+            "pages": [
+              "api/packages/cli",
+              "api/packages/core",
+              "api/packages/plugin-compiler",
+              "api/packages/plugin-composer",
+              "api/packages/runtime-mini",
+              "api/packages/runtime-web",
+              "api/packages/takin"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "One-codebase cross-platform compilation to 8+ mini-program platforms and Web",
+    "Supports both WeChat and Alipay mini-program DSL as source",
+    "Plugin-based architecture with full lifecycle hooks",
+    "Bundle and transform compile modes for different use cases",
+    "Supports miniprogram, subpackage, and plugin compile types",
+    "Runtime API normalization across platforms",
+    "TypeScript, Less/SCSS, JSONC/JSON5 file support",
+    "CSS class name compression experiments",
+    "Module sharing and consuming between subpackages",
+    "Built-in analyzer, mock server, and code generator"
+  ],
+  "publicApiSurface": [
+    "mor compile --target <wechat|alipay|baidu|bytedance|qq|kuaishou|taobao|dingding|web>",
+    "mor compose",
+    "mor generate",
+    "mor mock",
+    "createApp / aApp / wApp",
+    "createPage / aPage / wPage",
+    "createComponent / aComponent / wComponent",
+    "createPlugin / aPlugin / wPlugin",
+    "PageToComponent / aPageToComponent / wPageToComponent",
+    "init (runtime initializer)",
+    "Takin (core CLI engine class)",
+    "Plugin interface (apply, onUse, enforce)",
+    "Runner hooks (cli, matchedCommand, userConfigValidated, entryBuilder, webpackWrapper)",
+    "CompilerUserConfig (sourceType, target, compileMode, compileType, srcPath, outputPath, etc.)",
+    "@morjs/cli",
+    "@morjs/core",
+    "@morjs/api",
+    "@morjs/plugin-compiler",
+    "@morjs/plugin-composer",
+    "@morjs/runtime-mini",
+    "@morjs/runtime-web",
+    "@morjs/takin",
+    "@morjs/utils"
+  ]
+}
