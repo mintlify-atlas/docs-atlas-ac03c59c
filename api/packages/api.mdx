@@ -1,0 +1,174 @@
+---
+title: "@morjs/api"
+description: "The MorJS cross-platform runtime API layer. Provides a unified `mor` API object, module management, and re-exports all @morjs/runtime-base utilities."
+---
+
+## Overview
+
+`@morjs/api` is the runtime API package used inside mini-program source code. It exposes a single `mor` object that wraps the platform's native global API (`wx`, `my`, etc.) with normalization logic, plus utilities for module management (subpackages and plugins) and environment detection.
+
+| Property | Value |
+|---|---|
+| **Package** | `@morjs/api` |
+| **Version** | `1.0.69` |
+| **License** | ISC |
+| **Node** | `>= 12.13.0` |
+| **Exports** | CommonJS (`lib/`) and ESM (`esm/`) |
+
+<Note>
+  In most projects you use `@morjs/core` rather than `@morjs/api` directly. `@morjs/core` imports `@morjs/api` internally and re-exports the parts your app code needs. Use `@morjs/api` only when you need low-level access to the API object or module manager without the full App/Page/Component abstractions.
+</Note>
+
+## Installation
+
+```bash
+npm install @morjs/api
+```
+
+## Exports
+
+`@morjs/api` re-exports everything from `@morjs/runtime-base` and adds:
+
+### Default export — `mor`
+
+```ts
+import mor from '@morjs/api'
+```
+
+The `mor` object implements the `MorAPI` interface:
+
+```ts
+export interface MorAPI {
+  /** The mini-program's native global API object (wx, my, swan, etc.) */
+  global: any
+  /** Environment information (ENV_TYPE, versions, etc.) */
+  env: Record<string, any>
+  /** Returns the running App instance */
+  getApp: typeof getApp
+  /** Returns the current page stack */
+  getCurrentPages: typeof getCurrentPages
+  /** Require a static mini-program plugin */
+  requirePlugin: (pluginName: string) => any
+  /** Returns the current runtime environment type */
+  getEnv: typeof getEnv
+  /** Override the default mor API with custom adapters */
+  override: () => MorAPI
+  /** Additional platform-specific APIs */
+  [K: string]: any
+}
+```
+
+### `createApi`
+
+Create a custom `MorAPI` instance, optionally with adapter plugins:
+
+```ts
+import { createApi } from '@morjs/api'
+
+const customMor = createApi(
+  [
+    {
+      initApi(api, options) {
+        // extend api with custom methods
+        api.myCustomMethod = () => { /* ... */ }
+      }
+    }
+  ],
+  { /* options */ }
+)
+
+// Override the global mor instance with your custom one
+customMor.override()
+```
+
+<ParamField path="adapters" type="MorAPIAdapter[]">
+  Array of adapter objects. Each adapter may implement `initApi(api, options)` to add or override methods on the `MorAPI` object.
+</ParamField>
+
+<ParamField path="options" type="Record<string, any>" default="{}">
+  Options passed through to each adapter's `initApi` call.
+</ParamField>
+
+### `MorAPIAdapter` interface
+
+```ts
+export interface MorAPIAdapter {
+  initApi?: (api: MorAPI, options?: Record<string, any>) => void
+}
+```
+
+### Module manager exports
+
+`@morjs/api` also exports the module management layer used for integrating subpackages and plugins at runtime:
+
+```ts
+import { ModuleTypes, IModuleItem } from '@morjs/api'
+```
+
+#### `ModuleTypes` enum
+
+| Value | Description |
+|-------|-------------|
+| `SUBPACKAGE` | A lazy-loaded subpackage module |
+| `DYNAMIC_PLUGIN` | A dynamically loaded plugin module (Alipay only) |
+| `STATIC_PLUGIN` | A statically loaded plugin module |
+
+#### `IModuleItem` interface
+
+```ts
+export interface IModuleItem {
+  /** Unique module name */
+  name: string
+  /** Plugin ID (for plugin modules) */
+  id?: string
+  /** Module type */
+  type: ModuleTypes
+  /** Module version */
+  version?: string
+  /** Page route mapping: { logicalPath: realPath } */
+  routes: Record<string, string>
+  /** Capabilities exposed by host to plugin */
+  extend?: Record<string, any>
+  /** Module entry instance */
+  instance?: any
+  /** Success callback for dynamic plugin loading */
+  success?: (isInit?: boolean) => void
+}
+```
+
+### Re-exports from `@morjs/runtime-base`
+
+All exports from `@morjs/runtime-base` are available from `@morjs/api`:
+
+```ts
+import { ENV_TYPE, ENV_TYPE_DESC, getEnv, getGlobalObject, logger, event, transformApis, markAsUnsupport } from '@morjs/api'
+```
+
+| Export | Description |
+|--------|-------------|
+| `ENV_TYPE` | Enum: `WECHAT`, `ALIPAY`, `QQ`, `BAIDU`, `DINGDING`, `TAOBAO`, `BYTEDANCE`, `KUAISHOU`, `WEB` |
+| `ENV_TYPE_DESC` | Human-readable descriptions for each `ENV_TYPE` |
+| `getEnv()` | Returns the current `ENV_TYPE` value at runtime |
+| `getGlobalObject()` | Returns the platform global object (`wx`, `my`, etc.) |
+| `logger` | Shared logger instance |
+| `event` | Cross-platform event emitter |
+| `transformApis` | Internal API transform utility used by platform adapters |
+| `markAsUnsupport` | Mark an API method as unsupported on a given platform |
+
+## Usage in mini-program source
+
+```ts
+import mor from '@morjs/api'
+
+// Access the platform global API (wx/my/etc.)
+mor.navigateTo({ url: '/pages/detail/index' })
+
+// Check environment
+import { ENV_TYPE, getEnv } from '@morjs/api'
+if (getEnv() === ENV_TYPE.WECHAT) {
+  // WeChat-only logic
+}
+
+// Use native getCurrentPages
+const pages = mor.getCurrentPages()
+```

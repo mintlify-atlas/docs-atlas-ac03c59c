@@ -1,0 +1,179 @@
+---
+title: "@morjs/utils"
+description: "Internal utilities and re-exports used across all MorJS build-time packages. Re-exports @morjs/takin plus webpack, babel, postcss, zod, and other build toolchain dependencies."
+---
+
+## Overview
+
+`@morjs/utils` is the shared internal utilities package for MorJS's build toolchain. It re-exports `@morjs/takin` (the CLI engine) alongside a curated set of build-time dependencies, so all MorJS compiler plugins can import from a single, version-consistent source.
+
+| Property | Value |
+|---|---|
+| **Package** | `@morjs/utils` |
+| **Version** | `1.0.71` |
+| **License** | MIT |
+| **Node** | `>= 12.13.0` |
+
+<Warning>
+  `@morjs/utils` is an **internal** package. Its API surface can change between versions. Plugin authors should import from `@morjs/utils` when writing compiler plugins for MorJS, but should not depend on it for application code. Use `@morjs/api` or `@morjs/core` for runtime code.
+</Warning>
+
+## Installation
+
+```bash
+npm install @morjs/utils
+```
+
+## Key exports
+
+### Re-exported from `@morjs/takin`
+
+Everything from `@morjs/takin` is available directly from `@morjs/utils`. This includes `Takin`, `Runner`, `Plugin`, all runner hooks, config utilities, CLI helpers, and logger.
+
+```ts
+import { Plugin, Runner, Takin, logger, takin } from '@morjs/utils'
+```
+
+See the [`@morjs/takin` reference](/api/packages/takin) for the full API.
+
+### Webpack utilities
+
+```ts
+import { webpack, WebpackChain, WebpackWrapper, WebpackPlugin, WebpackUserConfig, WebpackDevServer } from '@morjs/utils'
+```
+
+| Export | Description |
+|--------|-------------|
+| `webpack` | The webpack 5 instance (version `5.76.0`) |
+| `WebpackChain` | `webpack-chain-5` for fluent webpack config modification |
+| `WebpackWrapper` | MorJS wrapper around a webpack compiler instance |
+| `WebpackPlugin` | Base class for webpack-integrated MorJS plugins |
+| `WebpackUserConfig` | User config schema additions for webpack-level config |
+| `WebpackDevServer` | `webpack-dev-server` (version `4.11.1`) |
+
+### Babel utilities
+
+```ts
+import { babelDeps } from '@morjs/utils'
+```
+
+All Babel 7 packages are re-exported: `@babel/core`, `@babel/parser`, `@babel/generator`, `@babel/traverse`, `@babel/types`, `@babel/template`, and related transform plugins.
+
+### PostCSS and PostHTML
+
+```ts
+import { postcss, posthtml, cssProcessorFactory } from '@morjs/utils'
+```
+
+| Export | Description |
+|--------|-------------|
+| `postcss` | PostCSS 8 instance |
+| `posthtml` | PostHTML 0.16 — used for template AST processing |
+| `cssProcessorFactory` | Factory for building CSS processor pipelines |
+
+### Schema validation (zod)
+
+```ts
+import { zod as z } from '@morjs/utils'
+```
+
+MorJS uses `zod` (bundled via `@morjs/takin`) for all config schema validation. Use the `zod` re-export to write type-safe config schemas that integrate with MorJS's `registerUserConfig` hook.
+
+### Glob and path utilities
+
+```ts
+import { glob, slash, micromatch } from '@morjs/utils'
+```
+
+| Export | Description |
+|--------|-------------|
+| `glob` | `fast-glob` instance (`fastGlob` from takin) |
+| `slash` | Normalize path separators to forward slashes |
+| `micromatch` | Glob matching (version `4.0.5`) |
+
+### TypeScript compiler
+
+```ts
+import { typescript } from '@morjs/utils'
+```
+
+The TypeScript 4.4.4 compiler instance. Used by the script parser to type-check and transform TypeScript source files.
+
+### Minification utilities
+
+```ts
+import { TerserPlugin, CssMinimizerPlugin, HtmlMinimizerPlugin, CopyWebpackPlugin } from '@morjs/utils'
+```
+
+These are the webpack plugin instances for JS minification (terser), CSS minification (css-minimizer), HTML minification, and asset copying.
+
+### Other utilities
+
+```ts
+import { pRetry, pQueue, cjsToEsmTransformer } from '@morjs/utils'
+```
+
+| Export | Description |
+|--------|-------------|
+| `pRetry` | Promise retry with exponential backoff |
+| `pQueue` | Promise queue with concurrency control |
+| `cjsToEsmTransformer` | Transform CommonJS to ESM (used internally for compat) |
+
+### Compiler hook extensions
+
+`@morjs/utils` also registers the following additional `RunnerHooks` that are only available to compiler plugins:
+
+| Hook | Type | Description |
+|------|------|-------------|
+| `webpackWrapper` | `SyncHook<WebpackWrapper>` | Tap to receive the webpack wrapper after it's created. Used to modify webpack configuration. |
+| `entryBuilder` | `AsyncSeriesHook<EntryBuilderHelpers>` | Tap to hook into the entry discovery and building phase. |
+| `scriptParser` | `SyncWaterfallHook<[CustomTransformers, FileParserOptions]>` | Waterfall hook for modifying TypeScript/Babel transformers for script files. |
+| `templateParser` | `AsyncSeriesWaterfallHook<...>` | Waterfall hook for modifying PostHTML AST transformers for template files. |
+| `styleParser` | `AsyncSeriesWaterfallHook<...>` | Waterfall hook for modifying PostCSS processors for style files. |
+
+```ts
+import { Plugin, Runner } from '@morjs/utils'
+
+class MyCompilerPlugin implements Plugin {
+  name = 'MyCompilerPlugin'
+
+  apply(runner: Runner) {
+    // Tap into webpack config modification
+    runner.hooks.webpackWrapper.tap(this.name, (webpackWrapper) => {
+      webpackWrapper.chain.resolve.alias
+        .set('@utils', path.resolve(__dirname, 'src/utils'))
+    })
+
+    // Tap into template AST processing
+    runner.hooks.templateParser.tap(this.name, (tree, options) => {
+      return tree.walk((node) => {
+        // Transform template nodes
+        return node
+      })
+    })
+  }
+}
+```
+
+## Usage in compiler plugins
+
+When writing a MorJS compiler plugin, import from `@morjs/utils` to get access to the plugin interface, runner hooks, and build utilities:
+
+```ts
+import { Plugin, Runner, logger, WebpackWrapper } from '@morjs/utils'
+
+export default class MyPlugin implements Plugin {
+  name = 'MyPlugin'
+
+  apply(runner: Runner) {
+    runner.hooks.webpackWrapper.tap(this.name, (wrapper: WebpackWrapper) => {
+      // Modify webpack config using webpack-chain API
+      wrapper.chain.module
+        .rule('my-loader')
+        .test(/\.myext$/)
+        .use('my-loader')
+        .loader(require.resolve('./my-loader'))
+    })
+  }
+}
+```

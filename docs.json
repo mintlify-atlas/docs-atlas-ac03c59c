@@ -117,11 +117,13 @@
             "pages": [
               "api/packages/cli",
               "api/packages/core",
+              "api/packages/api",
               "api/packages/plugin-compiler",
               "api/packages/plugin-composer",
               "api/packages/runtime-mini",
               "api/packages/runtime-web",
-              "api/packages/takin"
+              "api/packages/takin",
+              "api/packages/utils"
             ]
           }
         ]

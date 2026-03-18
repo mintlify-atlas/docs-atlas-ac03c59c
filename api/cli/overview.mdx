@@ -3,7 +3,7 @@ title: CLI overview
 description: All available mor commands, global flags, and how to explore help information from the terminal.
 ---
 
-The `mor` CLI is the primary interface for compiling, composing, generating, and mocking mini-programs with MorJS. Install it globally with:
+The `mor` CLI is the primary interface for compiling, composing, scaffolding, and analyzing mini-programs with MorJS. Install it globally with:
 
 ```bash
 npm install -g @morjs/cli
@@ -17,20 +17,27 @@ mor --version
 
 ## Available commands
 
-<Columns cols={2}>
+<CardGroup cols={2}>
   <Card title="compile" icon="hammer" href="/api/cli/compile">
-    Compile a mini-program project to one or more target platforms. Supports bundle and transform modes, watch mode, and production builds.
+    Compile a mini-program project to one or more target platforms. Supports bundle and transform modes, watch mode, production builds, and `--mock` for development mocking.
   </Card>
   <Card title="compose" icon="puzzle-piece" href="/api/cli/compose">
     Integrate multiple subpackages and host apps into a single mini-program output directory.
   </Card>
   <Card title="generate" icon="wand-magic-sparkles">
-    Scaffold new pages, components, and project structures using built-in or custom templates.
+    Scaffold new pages or components using built-in or custom templates. Usage: `mor generate <type> [...args]`. Alias: `mor g`.
   </Card>
-  <Card title="mock" icon="flask">
-    Start a local mock server to simulate API responses during development.
+  <Card title="init / create" icon="folder-plus">
+    Initialize a new MorJS project from a template. Usage: `mor init [projectDir]`. Alias: `mor create`. You can also use `npx create-mor`.
   </Card>
-</Columns>
+  <Card title="analyze" icon="chart-bar">
+    Analyze bundle size using `webpack-bundle-analyzer`. Usage: `mor analyze`.
+  </Card>
+</CardGroup>
+
+<Note>
+  There is no standalone `mor mock` command. Mocking is enabled by passing `--mock` to `mor compile` during development. See the [compile reference](/api/cli/compile) for details.
+</Note>
 
 ## Global flags
 
@@ -57,6 +64,7 @@ mor --help
 # Command-specific help
 mor compile --help
 mor compose --help
+mor analyze --help
 ```
 
 ## Configuration file

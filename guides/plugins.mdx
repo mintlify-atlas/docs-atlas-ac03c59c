@@ -217,15 +217,37 @@ export default defineConfig({
 
 ## `@morjs/plugin-generator`
 
-Provides the template scaffolding used by `mor create`. It is invoked automatically by the `create` command and is not typically configured directly.
+Provides project scaffolding and code generation. It exposes two commands: `mor init` / `mor create` for creating new projects, and `mor generate` / `mor g` for scaffolding pages and components within an existing project.
 
-### Usage
+### Create a new project
 
 ```bash
+mor init my-app
+# or equivalently
 mor create my-app
+# or using npx (no global install needed)
+npx create-mor my-app
 ```
 
 The generator guides you through an interactive prompt to select a template (Alipay mini-program, WeChat mini-program, etc.) and writes the starter files.
+
+### Generate pages or components
+
+```bash
+# Generate a new page
+mor generate page my-page
+# or using the alias
+mor g page my-page
+
+# Generate a new component
+mor generate component my-component
+```
+
+You can pass `--src-path`, `--source-type`, `--typescript`, `--less`, or `--scss` flags to control the generated output:
+
+```bash
+mor generate page detail --typescript --less --source-type wechat
+```
 
 ---
 
