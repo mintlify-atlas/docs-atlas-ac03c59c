@@ -1,0 +1,210 @@
+---
+title: "App API"
+description: "Runtime API for registering and managing the mini-program application lifecycle."
+---
+
+The App API provides functions to register a mini-program application with the MorJS runtime. It wraps the native `App()` constructor to add lifecycle hooks, event emitting, and cross-platform adapter support.
+
+## Functions
+
+### `createApp`
+
+Registers a mini-program application with the MorJS runtime. Initialises lifecycle hooks, runs registered plugins, and calls the platform's native `App()` constructor.
+
+```ts
+function createApp<T extends IData, G extends IData>(
+  options: MorAppOptions<T, G>,
+  solution?: MorSolution | MorSolution[],
+  extend?: {
+    globalApp?: (options: IData) => any
+    onHooksCreated?: ($hooks: MorHooks) => any
+  }
+): any
+```
+
+<ParamField path="options" type="MorAppOptions<T, G>" required>
+  The application configuration object. Supports both Alipay (`tinyapp.IAppOptionsMethods`) and WeChat (`WechatMiniprogram.App.Option`) option shapes, plus MorJS extensions.
+</ParamField>
+
+<ParamField path="solution" type="MorSolution | MorSolution[]">
+  One or more MorJS runtime solutions (plugin bundles) to initialise before the app is registered.
+</ParamField>
+
+<ParamField path="extend" type="object">
+  <Expandable title="extend properties">
+    <ParamField path="extend.globalApp" type="(options: IData) => any">
+      A custom constructor used in place of the native `App()`. Useful for mini-program plugin environments and sub-packages where `App` is not available.
+    </ParamField>
+    <ParamField path="extend.onHooksCreated" type="($hooks: MorHooks) => any">
+      Callback invoked immediately after the `MorHooks` instance is created, before any lifecycle hooks are wired. Use it to call `$hooks.pause()` / `$hooks.resume()` or to trigger specific hooks manually.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<Note>
+`createApp` can only be called once per mini-program. Calling it a second time without `extend.globalApp` logs an error and returns immediately.
+</Note>
+
+#### Example
+
+```ts
+import { createApp } from '@morjs/core'
+
+createApp({
+  globalData: {
+    userInfo: null
+  },
+  onLaunch(options) {
+    console.log('App launched', options)
+  },
+  onShow() {
+    console.log('App shown')
+  },
+  onHide() {
+    console.log('App hidden')
+  },
+  onError(msg) {
+    console.error('App error', msg)
+  }
+})
+```
+
+---
+
+### `aApp`
+
+Alias for `createApp`. Use when your source DSL is Alipay mini-program.
+
+```ts
+export const aApp = createApp
+```
+
+```ts
+import { aApp } from '@morjs/core'
+
+aApp({
+  onLaunch(options) {
+    console.log('Alipay app launched', options)
+  }
+})
+```
+
+---
+
+### `wApp`
+
+Alias for `createApp`. Use when your source DSL is WeChat mini-program.
+
+```ts
+export const wApp = createApp
+```
+
+```ts
+import { wApp } from '@morjs/core'
+
+wApp({
+  onLaunch(options) {
+    console.log('WeChat app launched', options)
+  }
+})
+```
+
+---
+
+### `registerAppAdapters`
+
+Registers one or more cross-platform app adapters. Adapters are called during `createApp` and can mutate the app options before they are passed to the native `App()` constructor.
+
+```ts
+function registerAppAdapters(
+  adapters?: MorAppAdapter | MorAppAdapter[]
+): void
+```
+
+<ParamField path="adapters" type="MorAppAdapter | MorAppAdapter[]">
+  A single adapter object or an array of adapter objects to register.
+</ParamField>
+
+```ts
+import { registerAppAdapters } from '@morjs/core'
+
+registerAppAdapters({
+  initApp(appOptions) {
+    // mutate appOptions before App() is called
+    appOptions.globalData = appOptions.globalData ?? {}
+  }
+})
+```
+
+---
+
+## Types
+
+### `MorAppInstance`
+
+Properties injected onto every app instance created by `createApp`.
+
+<ResponseField name="$morHooks" type="MorHooks" required>
+  MorJS runtime hooks. Use these to tap into App / Page / Component lifecycles from plugins.
+</ResponseField>
+
+<ResponseField name="$event" type="Emitter<any>" required>
+  Global event emitter shared across the entire mini-program. Used internally to broadcast app-level events to pages and components.
+</ResponseField>
+
+<ResponseField name="$context" type="IAppContext" required>
+  App context containing the `query` parameters received in `onLaunch`.
+</ResponseField>
+
+<ResponseField name="$morPluginsNames" type="string[]" required>
+  Names of all MorJS plugins that have been loaded and initialised for the current app.
+</ResponseField>
+
+---
+
+### `GetAppFunction`
+
+Type signature for the platform `getApp` function, extended to return `MorAppInstance`.
+
+```ts
+type GetAppFunction = <T = IData>(
+  opts?: { allowDefault?: boolean }
+) => MorAppInstance & T
+```
+
+<ParamField path="opts.allowDefault" type="boolean">
+  When `true`, returns a default implementation if `App` has not yet been defined. Useful in standalone sub-packages.
+</ParamField>
+
+---
+
+### `MorAppAdapter`
+
+Interface for app-level cross-platform adapters.
+
+```ts
+interface MorAppAdapter {
+  initApp?: (appOptions: Record<string, any>) => void
+}
+```
+
+<ResponseField name="initApp" type="(appOptions: Record<string, any>) => void">
+  Called once during `createApp`, before the native `App()` constructor runs. Receives the fully-constructed app options object.
+</ResponseField>
+
+---
+
+## Lifecycle hooks
+
+The following lifecycle methods are intercepted by MorJS and wrapped to fire the corresponding `MorHooks` entries:
+
+| Method | MorHook |
+|---|---|
+| `onLaunch` | `appOnLaunch` |
+| `onShow` | `appOnShow` |
+| `onHide` | `appOnHide` |
+| `onError` | `appOnError` |
+| `onPageNotFound` | `appOnPageNotFound` |
+| `onUnhandledRejection` | `appOnUnhandledRejection` |
+
+The `appOnConstruct` hook (or `appOnInit` for backwards compatibility) fires synchronously at the start of `createApp`, before any lifecycle wiring occurs.

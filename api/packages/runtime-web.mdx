@@ -1,0 +1,171 @@
+---
+title: "@morjs/runtime-web"
+description: "Web runtime for MorJS. Translates mini-program APIs, components, and lifecycle semantics to standard browser/H5 equivalents using React."
+---
+
+## Overview
+
+`@morjs/runtime-web` enables mini-programs written with Alipay or WeChat DSL to run in a standard web browser. It provides:
+
+- A web-compatible implementation of the mini-program API surface (`my.*`).
+- React-based implementations of built-in mini-program UI components.
+- A client-side router that emulates the mini-program page stack.
+- A DSL runtime that bridges AXML template semantics to React.
+
+| Property | Value |
+|---|---|
+| **Package** | `@morjs/runtime-web` |
+| **Renderer** | React |
+
+## Installation
+
+```bash
+npm install @morjs/runtime-web
+```
+
+## Exports
+
+`@morjs/runtime-web` re-exports everything from four sub-modules:
+
+```ts
+export * from './api'
+export * from './components'
+export * from './router'
+export * from './runtime'
+```
+
+## API layer (`./api`)
+
+Implements the Alipay `my.*` API surface for the browser. APIs are installed globally via `appendApis`.
+
+### Supported API categories
+
+<CardGroup cols={2}>
+  <Card title="Storage">
+    `getStorage`, `setStorage`, `removeStorage`, `clearStorage` and their sync variants.
+  </Card>
+  <Card title="Network">
+    `request`, `uploadFile`, `downloadFile`.
+  </Card>
+  <Card title="Routing">
+    `navigateTo`, `redirectTo`, `navigateBack`, `switchTab`, `reLaunch`.
+  </Card>
+  <Card title="UI / Interactive">
+    `showToast`, `hideToast`, `showLoading`, `hideLoading`, `showModal`, `showActionSheet`, `alert`, `confirm`, `prompt`.
+  </Card>
+  <Card title="Device">
+    `getSystemInfo`, `getSystemInfoSync`, `getNetworkType`, `makePhoneCall`.
+  </Card>
+  <Card title="Clipboard">
+    `getClipboardData`, `setClipboardData`.
+  </Card>
+  <Card title="Location">
+    `getLocation`, `chooseLocation`.
+  </Card>
+  <Card title="Image">
+    `chooseImage`, `previewImage`, `saveImageToPhotosAlbum`.
+  </Card>
+  <Card title="Audio / Video">
+    `createInnerAudioContext`, `chooseVideo`.
+  </Card>
+  <Card title="File">
+    `saveFile`, `getFileInfo`, `getSavedFileList`, `removeSavedFile`, `openDocument`.
+  </Card>
+  <Card title="Keyboard">
+    `hideKeyboard`, `getSelectedTextRange`.
+  </Card>
+  <Card title="Element Query">
+    `createSelectorQuery`, `createIntersectionObserver`.
+  </Card>
+  <Card title="Tab Bar">
+    `showTabBar`, `hideTabBar`, `setTabBarItem`, `setTabBarStyle`.
+  </Card>
+  <Card title="Canvas">
+    `createCanvasContext`, `canvasToTempFilePath`.
+  </Card>
+  <Card title="Animation">
+    `createAnimation`.
+  </Card>
+  <Card title="Map">
+    `createMapContext`.
+  </Card>
+</CardGroup>
+
+### Exported symbols
+
+| Symbol | Description |
+|---|---|
+| `default` (named `my`) | The global mini-program API object |
+| `appendApis` | Add additional APIs to `my` without conflict |
+| `MobileDetect` | Re-exported `mobile-detect` instance for device detection |
+| `IntersectionObserver` | Re-exported `intersection-observer` polyfill |
+
+## Components layer (`./components`)
+
+Provides React Web Component implementations for native mini-program UI components registered as custom elements.
+
+### Base components
+
+| Component | Description |
+|---|---|
+| `view` | Basic block container |
+| `scroll-view` | Scrollable container with pull-down and bottom-reach events |
+| `swiper` / `swiper-item` | Carousel / slideshow |
+| `movable-area` / `movable-view` | Drag-and-drop container |
+| `text` | Inline text |
+| `rich-text` | HTML-rich text renderer |
+| `icon` | Mini-program icon set |
+| `progress` | Progress bar |
+| `navigator` | Declarative page navigation link |
+| `tabbar` / `tabbar-item` | Bottom tab bar |
+
+### Open / extended components
+
+Additional UI APIs registered via `appendApis`:
+
+| API | Description |
+|---|---|
+| `chooseCity` | City picker modal |
+| `datePicker` | Date and time picker |
+| `optionSelect` | Single/multi-option selector |
+| `multiLevelSelect` | Cascading selector |
+| `canvas` (UI) | Canvas API bridge |
+| `map` (UI) | Map component bridge |
+
+## Router (`./router`)
+
+Implements a history-based client-side router that mirrors the mini-program page stack model.
+
+| Symbol | Description |
+|---|---|
+| `router` | Singleton router instance |
+| `pageStack` | Observable page stack |
+| `tabbar` (router) | Tab bar state management |
+| `history` | Underlying browser history wrapper |
+| `dom` | DOM utilities used by the router |
+| `cache` | Page component cache |
+| `api` | Route API helpers (`navigateTo`, etc.) |
+
+## Runtime (`./runtime`)
+
+DSL execution engine that bridges AXML template semantics to React.
+
+| Symbol | Description |
+|---|---|
+| `Component` | Web component base class used by compiled components |
+| `Page` | Web page base class used by compiled pages |
+| `createTemplateManager` | Factory for `TemplateManager` instances (AXML `<template>` support) |
+| `Slot` | React component implementing AXML `<slot>` |
+| `Block` | React component implementing AXML `<block>` |
+| `createStyle` | Converts inline style strings/objects for React |
+| `getEvent` | Resolves an AXML event name to a React event handler |
+| `bindThis` | Binds a method to its component instance |
+| `registEvents` | Registers AXML event handlers on a component |
+| `ref` | AXML `ref` binding helper |
+| `mergeConfig` | Merges global app config with page-level config |
+| `toJsonString` | Serialises a value to a JSON string attribute |
+| `getString` | Renders content to a string or React element |
+| `getForValue` | Normalises values for AXML `a:for` iteration |
+| `axmlApi` | Special API object available inside AXML expressions |
+| `setRootFontSizeForRem` | Manually sets the root `font-size` for `rpx` conversion |
+| `autoSyncRootFontSize` | Automatically keeps root `font-size` in sync with viewport |

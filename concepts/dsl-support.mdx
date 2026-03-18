@@ -1,0 +1,162 @@
+---
+title: "DSL support"
+description: "MorJS supports both WeChat DSL and Alipay DSL as source languages, with automatic detection and explicit override."
+---
+
+MorJS does not define its own template language. You write mini-programs using the native DSL of either WeChat or Alipay, and MorJS converts that DSL to the syntax required by the output target.
+
+## Source types
+
+The `sourceType` configuration field tells MorJS which DSL your source files use:
+
+| Value | DSL | Template extension | Global object |
+|-------|-----|--------------------|---------------|
+| `wechat` | WeChat mini-program DSL | `.wxml` | `wx` |
+| `alipay` | Alipay mini-program DSL | `.axml` | `my` |
+
+These are the only two valid values for `sourceType`. All other targets are compilation outputs, not source types.
+
+## Automatic detection
+
+By default you do not need to set `sourceType`. MorJS inspects the file extensions in your source directory:
+
+- If it finds `.wxml` files, it treats the source as WeChat DSL (`wechat`).
+- If it finds `.axml` files, it treats the source as Alipay DSL (`alipay`).
+
+The default value in the schema is `wechat`:
+
+```typescript
+// From packages/plugin-compiler/src/constants.ts
+sourceType: z.nativeEnum(SourceTypes).default(SourceTypes.wechat)
+```
+
+## When to set sourceType explicitly
+
+Set `sourceType` manually when:
+
+- Both `.wxml` and `.axml` files exist in the same directory (MorJS cannot infer unambiguously).
+- You want to make the source type explicit in CI or configuration-as-code.
+
+```typescript
+export default defineConfig([
+  {
+    target: 'alipay',
+    sourceType: 'wechat',  // WeChat source compiled to Alipay
+  }
+])
+```
+
+You can also pass it on the command line:
+
+```bash
+mor compile --target alipay --source-type wechat
+```
+
+## DSL differences
+
+<Tabs>
+  <Tab title="WeChat DSL">
+    WeChat-flavored mini-program source uses `wx`-prefixed attributes and the `wx` global object:
+
+    ```xml
+    <!-- pages/index/index.wxml -->
+    <view wx:if="{{show}}">
+      <text>Hello World</text>
+    </view>
+    <block wx:for="{{list}}" wx:key="id">
+      <view>{{item.name}}</view>
+    </block>
+    ```
+
+    ```javascript
+    // pages/index/index.js
+    Page({
+      data: { show: true, list: [] },
+      onLoad() {
+        wx.showToast({ title: 'Loaded' })
+      }
+    })
+    ```
+  </Tab>
+  <Tab title="Alipay DSL">
+    Alipay-flavored mini-program source uses `a`-prefixed attributes and the `my` global object:
+
+    ```xml
+    <!-- pages/index/index.axml -->
+    <view a:if="{{show}}">
+      <text>Hello World</text>
+    </view>
+    <block a:for="{{list}}" a:key="id">
+      <view>{{item.name}}</view>
+    </block>
+    ```
+
+    ```javascript
+    // pages/index/index.js
+    Page({
+      data: { show: true, list: [] },
+      onLoad() {
+        my.showToast({ content: 'Loaded' })
+      }
+    })
+    ```
+  </Tab>
+</Tabs>
+
+MorJS rewrites template directives at compile time. When compiling WeChat source to Alipay, `wx:if` becomes `a:if`, `wx:for` becomes `a:for`, and so on.
+
+## Inline script: wxs and sjs
+
+Both DSLs support small inline or imported script modules:
+
+| Feature | WeChat | Alipay |
+|---------|--------|--------|
+| Tag name | `<wxs>` | `<import-sjs>` |
+| Source attribute | `src` | `from` |
+| Module attribute | `module` | `name` |
+| Inline content | Supported | Not supported |
+| File extension | `.wxs` | `.sjs` |
+
+## Supported file types
+
+Beyond the native mini-program file types, MorJS adds support for the following extensions:
+
+<AccordionGroup>
+  <Accordion title="Scripts">
+    | Extension | Description |
+    |-----------|-------------|
+    | `.js` | Standard JavaScript (all targets) |
+    | `.ts` | TypeScript |
+    | `.mjs` | ES module JavaScript |
+    | `.mts` | ES module TypeScript |
+  </Accordion>
+  <Accordion title="Styles">
+    | Extension | Description |
+    |-----------|-------------|
+    | `.wxss` | WeChat stylesheet |
+    | `.acss` | Alipay stylesheet |
+    | `.css` | Standard CSS (Baidu and others) |
+    | `.less` | Less preprocessor |
+    | `.scss` / `.sass` | Sass preprocessor |
+  </Accordion>
+  <Accordion title="Config files">
+    | Extension | Description |
+    |-----------|-------------|
+    | `.json` | Standard JSON |
+    | `.jsonc` | JSON with comments |
+    | `.json5` | JSON5 (relaxed JSON syntax) |
+  </Accordion>
+  <Accordion title="Templates">
+    | Extension | Description |
+    |-----------|-------------|
+    | `.wxml` | WeChat template |
+    | `.axml` | Alipay template |
+    | `.swan` | Baidu template |
+    | `.ttml` | ByteDance template |
+    | `.qml` | QQ template |
+  </Accordion>
+</AccordionGroup>
+
+<Tip>
+Using TypeScript (`.ts`) is recommended. MorJS has first-class TypeScript support with configurable `compilerOptions.module` and `compilerOptions.target` per platform.
+</Tip>

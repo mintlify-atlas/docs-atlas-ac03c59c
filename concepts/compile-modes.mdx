@@ -1,0 +1,126 @@
+---
+title: "Compile modes"
+description: "MorJS supports two compile modes — bundle and transform — each suited for different output and dependency needs."
+---
+
+The `compileMode` configuration option controls how MorJS processes your source code and its dependencies. Choosing the right mode affects whether npm packages are resolved and bundled, and whether the output is a self-contained artifact or a set of converted source files.
+
+## Available modes
+
+The `CompileModes` enum defines the valid values:
+
+```typescript
+// From packages/plugin-compiler/src/constants.ts
+export const CompileModes = objectEnum([
+  'bundle',
+  'transform',
+  'transfer',  // deprecated — merged into transform
+  'default'    // deprecated — merged into transform
+])
+```
+
+<Warning>
+`transfer` and `default` are deprecated. They have been merged into `transform`. For backward compatibility they are still accepted, but you should migrate to `transform` in new projects.
+</Warning>
+
+## bundle mode
+
+`bundle` is the default compile mode.
+
+MorJS runs a full webpack compilation pass. It resolves and processes all npm imports, applies tree-shaking, handles module splitting, and produces a self-contained output directory with no `node_modules` folder.
+
+**When to use bundle mode:**
+
+- Production builds destined for platform review.
+- Projects that depend on npm component libraries (`processNodeModules`).
+- When you want dead-code elimination and chunk optimization.
+- When output file count and size need to be minimized.
+
+```typescript
+export default defineConfig([
+  {
+    name: 'wechat',
+    target: 'wechat',
+    sourceType: 'wechat',
+    compileMode: 'bundle',  // default — can be omitted
+  }
+])
+```
+
+**Behavior in bundle mode:**
+
+- npm packages listed in `dependencies` are resolved through webpack's module graph.
+- The output directory contains no `node_modules` folder; all dependencies are inlined.
+- `define` variable substitution is supported.
+- `alias` path rewriting is supported.
+- Bundle analysis is available via the `analyzer` option.
+
+## transform mode
+
+`transform` mode converts and transpiles source files without running a full webpack bundling pass. npm packages are **not** resolved or processed — they are expected to be present in `node_modules` at the install step of the consuming environment.
+
+**When to use transform mode:**
+
+- Publishing a reusable component library or SDK to npm.
+- Generating intermediate source that another tool or project will consume.
+- Scenarios where the target environment will install and resolve dependencies itself.
+- Fast iteration where npm resolution is unnecessary.
+
+```typescript
+export default defineConfig([
+  {
+    name: 'alipay-lib',
+    target: 'alipay',
+    sourceType: 'wechat',
+    compileMode: 'transform',
+  }
+])
+```
+
+**Behavior in transform mode:**
+
+- Source files are transpiled (TypeScript, Less/SCSS, template directives) but npm imports are left as-is.
+- No webpack bundling or chunk splitting.
+- Declaration files (`.d.ts`) can be generated when `compilerOptions.declaration` is `true`.
+- `processNodeModules` has no effect in this mode.
+
+## Comparison
+
+| Feature | `bundle` | `transform` |
+|---------|----------|--------------|
+| Webpack bundling | Yes | No |
+| npm dependency resolution | Yes | No |
+| `node_modules` in output | No | No (untouched) |
+| TypeScript transpilation | Yes | Yes |
+| Less / SCSS | Yes | Yes |
+| Template directive rewrite | Yes | Yes |
+| `define` substitution | Yes | No |
+| Dead-code elimination | Yes | No |
+| Declaration files | No | Optional |
+| Output style | Self-contained bundle | Converted source files |
+
+## Setting the mode via CLI
+
+```bash
+# Use bundle mode (default)
+mor compile --target wechat
+
+# Use transform mode
+mor compile --target alipay --compile-mode transform
+```
+
+## processNodeModules
+
+In `bundle` mode you can enable processing of npm component libraries that also contain mini-program source files:
+
+```typescript
+export default defineConfig([
+  {
+    target: 'wechat',
+    compileMode: 'bundle',
+    processNodeModules: true,
+  }
+])
+```
+
+By default `processNodeModules` is `false`. When enabled, MorJS processes and cross-compiles mini-program component packages found in `node_modules`.

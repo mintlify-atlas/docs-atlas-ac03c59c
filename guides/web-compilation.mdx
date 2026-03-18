@@ -1,0 +1,175 @@
+---
+title: Web Compilation
+description: Compile mini-program source to a web application using the plugin-compiler-web target.
+---
+
+## Overview
+
+Setting `target: 'web'` compiles your Alipay or WeChat mini-program source into a standard web application. The output is a webpack bundle with HTML entry points — one route per mini-program page.
+
+The web compiler is built on top of the Alipay compiler plugin and re-uses its template processing logic, so Alipay DSL (`.axml` / `.acss`) is natively supported. WeChat DSL is also supported through cross-platform transformation.
+
+## Minimal configuration
+
+```typescript mor.config.ts
+import { defineConfig } from '@morjs/cli'
+
+export default defineConfig({
+  name: 'web',
+  sourceType: 'alipay',  // or 'wechat'
+  target: 'web'
+})
+```
+
+Output is written to `dist/web` by default.
+
+## Web-specific config (`web` field)
+
+All web-specific options live under the `web` key:
+
+```typescript mor.config.ts
+import { defineConfig } from '@morjs/cli'
+
+export default defineConfig({
+  name: 'web',
+  sourceType: 'alipay',
+  target: 'web',
+  globalObject: 'customMy',  // Must not be 'my'
+  web: {
+    // rpx unit conversion
+    needRpx: true,
+    rpxRootValue: 32,
+
+    // Responsive font size (px-based layout)
+    responsiveRootFontSize: 16,
+
+    // Navigation bar
+    showHeader: true,
+    showBack: true,
+
+    // Public path for assets
+    publicPath: '/',
+
+    // Asset inlining threshold (bytes), default 8192
+    inlineAssetLimit: 8192,
+
+    // Dev server (webpack-dev-server options)
+    devServer: {
+      host: 'local-ip',
+      port: 8888
+    },
+
+    // Style isolation — adds a unique hash per page to prevent conflicts
+    styleScope: false,
+
+    // Emit intermediate compiled files alongside the final bundle
+    emitIntermediateAssets: false,
+
+    // App-level runtime config written to window.$MOR_APP_CONFIG
+    appConfig: {
+      apiNoConflict: false,
+      customTabBarKey: 'tabBarKey',
+      components: {
+        map: {
+          sdk: '',
+          version: '',
+          key: ''
+        }
+      }
+    }
+  }
+})
+```
+
+## Pages as web routes
+
+Each entry in `app.json`'s `pages` array becomes a separate webpack entry point and an HTML file in the output. The routing is hash-based by default.
+
+For example, with this `app.json`:
+
+```json
+{
+  "pages": [
+    "pages/index/index",
+    "pages/detail/index"
+  ]
+}
+```
+
+The web output will contain:
+- `pages/index/index.html`
+- `pages/detail/index.html`
+
+Navigation between pages using mini-program APIs (`my.navigateTo`, etc.) is handled by `@morjs/runtime-web`'s router.
+
+## Runtime web package
+
+The web target depends on `@morjs/runtime-web` for:
+
+- Mini-program API polyfills (`my.*` / `wx.*` → browser equivalents)
+- Built-in component implementations (`view`, `text`, `image`, `scroll-view`, etc.)
+- Page/App lifecycle management in the browser
+- Router bridging hash URLs to mini-program navigation
+
+Install it as a dependency:
+
+```bash
+npm install @morjs/runtime-web
+```
+
+<Note>
+  The web compiler locates `@morjs/runtime-web` automatically. Ensure it is installed in the same `node_modules` tree as `@morjs/cli`.
+</Note>
+
+## `globalObject` restriction
+
+<Warning>
+  Do **not** set `globalObject: 'my'` for the web target. The `my` object is injected by mini-program web-view environments and would conflict. Use a custom name such as `customMy` or `myPro` (the framework default).
+</Warning>
+
+```typescript
+{
+  target: 'web',
+  globalObject: 'customMy'  // safe
+}
+```
+
+## Development server
+
+The web target supports a built-in dev server through `web.devServer` (webpack-dev-server options):
+
+```typescript
+{
+  target: 'web',
+  web: {
+    devServer: {
+      host: 'local-ip',
+      port: 8888,
+      open: true
+    }
+  }
+}
+```
+
+Start it with:
+
+```bash
+mor compile --name web -w
+```
+
+## Known differences and limitations
+
+<CardGroup cols={1}>
+  <Card title="No native mini-program APIs">
+    Some platform-specific APIs (payments, biometrics, hardware sensors) have no browser equivalent and must be stubbed or removed.
+  </Card>
+  <Card title="Template compatibility">
+    Complex SJS/WXS scripts and some template directives may require manual adjustments. The compiler handles common patterns automatically.
+  </Card>
+  <Card title="CSS units">
+    `rpx` units are converted to `rem` by default (controlled by `needRpx` and `rpxRootValue`). Use `usePx` to convert to `px` instead.
+  </Card>
+  <Card title="tabBar">
+    The tabBar is rendered via the web runtime. Use `appConfig.customTabBarKey` to control the active tab via URL query parameter.
+  </Card>
+</CardGroup>

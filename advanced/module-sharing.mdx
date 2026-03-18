@@ -1,0 +1,166 @@
+---
+title: 'Module sharing'
+description: 'Share npm dependencies across main and sub-packages in a split-repository setup using the shared and consumes configuration.'
+---
+
+In mini-program development, the main package and sub-packages are sometimes developed in separate repositories and composed at integration time. When a sub-package depends on the same npm module as the main package, bundling it twice inflates the package size.
+
+MorJS provides `shared` and `consumes` configuration options that let the main package expose modules at runtime, so sub-packages can consume them without bundling their own copy.
+
+<Note>
+  Module sharing only works in `bundle` compile mode. It is disabled automatically for `web`, `web-pro`, and `weex-pro` targets.
+</Note>
+
+## How it works
+
+The `ModuleSharingAndConsumingPlugin` (in `packages/plugin-compiler/src/plugins/moduleSharingAndConsumingPlugin.ts`) implements sharing through two mechanisms:
+
+1. **shared** — generates a virtual `mor.s.js` (or `mor.s.<suffix>.js`) file that imports specified npm modules and attaches them to a global container (`my.mor_shared` for Alipay, `wx.mor_shared` for WeChat).
+2. **consumes** — marks specified npm modules as `externals` of type `var`, so they are read from the global container at runtime instead of bundled.
+
+## Configuration
+
+### shared
+
+Configure `shared` in the main package's `mor.config.ts`:
+
+```typescript
+// mor.config.ts (main package)
+export default defineConfig([
+  {
+    name: 'alipay',
+    target: 'alipay',
+    compileType: 'miniprogram',
+    // Share these npm modules with sub-packages
+    shared: [
+      // String form: module name is used as both the import source and the export key
+      'lodash',
+      'dayjs',
+      // Object form: { exportKey: importSource }
+      // Useful when the key seen by consumers differs from the npm package name
+      { 'my-utils': '@company/my-utils' }
+    ]
+  }
+])
+```
+
+This generates a virtual file with content similar to:
+
+```javascript
+import * as shared1 from 'lodash';
+import * as shared2 from 'dayjs';
+import * as shared3 from '@company/my-utils';
+
+my.mor_shared = my.mor_shared || {};
+my.mor_shared['lodash'] = shared1;
+my.mor_shared['dayjs'] = shared2;
+my.mor_shared['my-utils'] = shared3;
+```
+
+### consumes
+
+Configure `consumes` in the sub-package's `mor.config.ts`:
+
+```typescript
+// mor.config.ts (sub-package)
+export default defineConfig([
+  {
+    name: 'alipay-sub',
+    target: 'alipay',
+    compileType: 'subpackage',
+    // Consume shared modules from the main package instead of bundling them
+    consumes: [
+      'lodash',
+      'dayjs',
+      { 'my-utils': 'my-utils' }
+    ]
+  }
+])
+```
+
+At compile time, `import _ from 'lodash'` in the sub-package becomes:
+
+```javascript
+const _ = my.mor_shared['lodash']
+```
+
+### Mixed string and object syntax
+
+Both `shared` and `consumes` accept a mixed array of strings and plain objects:
+
+```typescript
+shared: [
+  // string — key and source are both 'react'
+  'react',
+  // object — key is 'react-dom', source is 'react-dom'
+  { 'react-dom': 'react-dom' }
+]
+```
+
+## generateAppJSONScript
+
+When compiling a sub-package for integration into a host app, MorJS can generate a `mor.p.js` script that the host app runs to update its `app.json` with the sub-package's pages.
+
+```typescript
+export default defineConfig([
+  {
+    name: 'alipay-sub',
+    target: 'alipay',
+    compileType: 'subpackage',
+    // Default: true. Set to false to skip mor.p.js generation.
+    generateAppJSONScript: true
+  }
+])
+```
+
+The generated `mor.p.js` file is placed alongside the compiled output. The host application includes this script to dynamically register the sub-package's pages into its `app.json` at integration update time.
+
+## Full integration example
+
+<CodeGroup>
+
+```typescript main/mor.config.ts
+import { defineConfig } from '@morjs/cli'
+
+export default defineConfig([
+  {
+    name: 'alipay',
+    target: 'alipay',
+    compileType: 'miniprogram',
+    srcPath: './src',
+    outputPath: './dist/alipay',
+    shared: ['lodash', 'dayjs']
+  }
+])
+```
+
+```typescript sub/mor.config.ts
+import { defineConfig } from '@morjs/cli'
+
+export default defineConfig([
+  {
+    name: 'alipay-sub',
+    target: 'alipay',
+    compileType: 'subpackage',
+    srcPath: './src',
+    outputPath: './dist/alipay',
+    consumes: ['lodash', 'dayjs'],
+    generateAppJSONScript: true
+  }
+])
+```
+
+</CodeGroup>
+
+## globalNameSuffix
+
+If multiple sub-packages share modules with different configurations, use `globalNameSuffix` to avoid naming collisions on the global container:
+
+```typescript
+{
+  globalNameSuffix: 'packageA',
+  shared: ['lodash']
+}
+```
+
+This produces a container named `my.mor_shared_packageA` and a shared file named `mor.s.packageA.js`.

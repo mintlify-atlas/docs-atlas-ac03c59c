@@ -1,0 +1,259 @@
+---
+title: mor compose
+description: Reference for the mor compose command, which integrates multiple subpackages and host apps into a single mini-program output.
+---
+
+The `compose` command assembles a mini-program from multiple independently developed modules — a host app, main packages, subpackages, and plugins — into a single output directory.
+
+```bash
+mor compose [options]
+```
+
+## How compose works
+
+Compose runs through up to eight sequential stages for each module:
+
+1. **Initial** — Load module metadata and compare hashes.
+2. **Download** — Fetch the module from git, npm, tar, file, or symlink.
+3. **Before scripts** — Run pre-processing shell commands.
+4. **Config loaded** — Read `subpackage.json`, `plugin.json`, or `app.json`.
+5. **Copied or compiled** — Copy the module output into the host directory.
+6. **After scripts** — Run post-processing shell commands.
+7. **Composed** — Merge module routing into the host `app.json`.
+8. **Retry** — Automatically retry stages 2–6 on failure.
+
+MorJS caches module downloads by hashing each module's source configuration. A module is re-downloaded only when its `git`, `npm`, `tar`, `dist`, or `mode` settings change.
+
+## Flags
+
+<ParamField path="-t, --target" type="string">
+  The platform target (for example, `wechat`, `alipay`). Used when modules need to be compiled before integration.
+</ParamField>
+
+<ParamField path="-o, --output-path" type="string">
+  The directory where the composed output is written. Defaults to the target's default output path.
+</ParamField>
+
+<ParamField path="--compile-type" type="string">
+  The compile type of the host. Accepted values: `miniprogram`, `plugin`, `subpackage`, `component`.
+</ParamField>
+
+<ParamField path="--with-modules" type="string">
+  Include only matching modules in the integration. Accepts glob patterns. Pass the flag multiple times to include several patterns.
+</ParamField>
+
+<ParamField path="--without-modules" type="string">
+  Exclude matching modules from the integration. Accepts glob patterns.
+</ParamField>
+
+<ParamField path="--from-state" type="number">
+  Force modules that have passed this state to restart from it. Useful for recovering from a partial integration.
+
+  State values: `0` initial, `1` downloaded, `2` before-scripts executed, `3` config loaded, `4` copied/compiled, `5` after-scripts executed, `6` composed.
+</ParamField>
+
+<ParamField path="--to-state" type="number">
+  Stop integration at this state. Useful for running only the download phase or only the copy phase.
+</ParamField>
+
+<ParamField path="--concurrency" type="number">
+  Maximum number of modules to download and process in parallel. Defaults to the system queue concurrency.
+</ParamField>
+
+<ParamField path="--combine-modules" type="boolean">
+  Flatten all subpackage pages into the host `app.json` `pages` array instead of keeping them in `subPackages`. Useful for platforms that do not support subpackages.
+</ParamField>
+
+## Configuration in mor.config.ts
+
+Compose is configured under the same `mor.config.ts` config object as the compiler. Set `compose: true` to enable it.
+
+```typescript mor.config.ts
+import { defineConfig } from '@morjs/cli'
+
+export default defineConfig({
+  name: 'my-app',
+  sourceType: 'wechat',
+  target: 'wechat',
+
+  // Enable compose
+  compose: true,
+
+  // Host application
+  host: {
+    git: {
+      url: 'https://github.com/my-org/host-app.git',
+      branch: 'main'
+    },
+    dist: 'dist/wechat'
+  },
+
+  // Modules to integrate
+  modules: [
+    {
+      name: 'shop',
+      type: 'subpackage',
+      npm: {
+        name: '@my-org/shop-subpackage',
+        version: 'latest'
+      },
+      dist: 'dist/wechat'
+    },
+    {
+      name: 'user',
+      type: 'subpackage',
+      git: {
+        url: 'https://github.com/my-org/user-subpackage.git',
+        branch: 'release'
+      },
+      dist: 'dist/wechat',
+      scripts: {
+        before: ['npm install', 'npm run build'],
+        after: []
+      }
+    }
+  ]
+})
+```
+
+### Module downloader options
+
+Each module entry must include exactly one downloader configuration:
+
+<AccordionGroup>
+  <Accordion title="git — Clone from a git repository">
+    ```typescript
+    git: {
+      url: 'https://github.com/org/repo.git', // required
+      branch: 'main',  // default: 'master'
+      commit: 'abc123',  // optional: pin to a specific commit
+      tag: 'v1.2.0'   // optional: pin to a tag
+    }
+    // or shorthand:
+    git: 'https://github.com/org/repo.git'
+    ```
+  </Accordion>
+  <Accordion title="npm — Download from an npm registry">
+    ```typescript
+    npm: {
+      name: '@my-org/my-subpackage',  // required
+      version: '1.0.0',               // default: 'latest'
+      registry: 'https://registry.npmjs.org'  // optional
+    }
+    // or shorthand:
+    npm: '@my-org/my-subpackage'
+    ```
+  </Accordion>
+  <Accordion title="file — Use a local path">
+    ```typescript
+    file: {
+      path: './packages/my-subpackage'
+    }
+    // or shorthand:
+    file: './packages/my-subpackage'
+    ```
+  </Accordion>
+  <Accordion title="link — Create a symlink to a local path">
+    ```typescript
+    link: {
+      path: './packages/my-subpackage'
+    }
+    // or shorthand:
+    link: './packages/my-subpackage'
+    ```
+  </Accordion>
+  <Accordion title="tar — Download from a tarball URL">
+    ```typescript
+    tar: {
+      url: 'https://example.com/release.tar.gz'
+    }
+    // or shorthand:
+    tar: 'https://example.com/release.tar.gz'
+    ```
+  </Accordion>
+</AccordionGroup>
+
+### Module type
+
+<ParamField path="modules[].type" type="string" default="subpackage">
+  Determines how the module's pages are merged into the host `app.json`.
+
+  - `subpackage` — Pages are added to `subPackages`.
+  - `main` — Pages are added directly to the top-level `pages` array.
+  - `plugin` — Plugin configuration is pulled and routing support is added.
+</ParamField>
+
+### Module integration mode
+
+<ParamField path="modules[].mode" type="string" default="compose">
+  - `compose` — The module's compiled output is copied directly into the host output directory.
+  - `compile` — The module is compiled by MorJS as part of the current build, then composed.
+</ParamField>
+
+### Module scripts
+
+<ParamField path="modules[].scripts" type="object">
+  Shell commands to run at different stages of the integration lifecycle.
+
+  ```typescript
+  scripts: {
+    before: ['npm install', 'npm run build'],  // run before copy/compile
+    after: ['echo done'],                       // run after copy/compile
+    composed: ['./post-compose.sh'],            // run after all modules are composed
+    env: { NODE_ENV: 'production' },            // environment variables for all scripts
+    options: {}                                 // execa options
+  }
+  ```
+
+  The following environment variables are injected automatically into each script:
+
+  | Variable | Description |
+  |----------|-------------|
+  | `MOR_COMPOSER_MODULE_CWD` | Absolute path of the project working directory |
+  | `MOR_COMPOSER_MODULE_TYPE` | Module type (`host`, `main`, `subpackage`, `plugin`) |
+  | `MOR_COMPOSER_MODULE_HASH` | Module hash |
+  | `MOR_COMPOSER_MODULE_ROOT` | Module root directory (relative to cwd) |
+  | `MOR_COMPOSER_MODULE_SOURCE` | Module source directory (relative to cwd) |
+  | `MOR_COMPOSER_MODULE_OUTPUT_FROM` | Compiled output source path |
+  | `MOR_COMPOSER_MODULE_OUTPUT_TO` | Composed output destination path |
+</ParamField>
+
+### Combine modules
+
+<ParamField path="combineModules" type="boolean" default="false">
+  When `true`, all subpackage pages are merged into the host's top-level `pages` array, removing the `subPackages` section from `app.json`. Use this for platforms that do not support the subpackage model.
+</ParamField>
+
+## Usage examples
+
+<CodeGroup>
+
+```bash Compose all modules
+mor compose --target wechat
+```
+
+```bash Compose specific modules only
+mor compose --target wechat --with-modules shop --with-modules user
+```
+
+```bash Skip a module
+mor compose --target wechat --without-modules legacy-module
+```
+
+```bash Download only, do not copy
+mor compose --target wechat --to-state 1
+```
+
+```bash Re-run from the before-scripts stage
+mor compose --target wechat --from-state 2
+```
+
+```bash Limit parallel downloads to 2
+mor compose --target wechat --concurrency 2
+```
+
+</CodeGroup>
+
+<Card title="Configuration reference →" icon="gear" href="/api/config/mor-config">
+  Full mor.config.ts documentation including all compose configuration fields.
+</Card>

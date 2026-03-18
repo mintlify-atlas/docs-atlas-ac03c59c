@@ -1,0 +1,137 @@
+---
+title: "@morjs/runtime-mini"
+description: "Cross-platform runtime adapters for native mini-program environments. Translates Alipay or WeChat DSL APIs, page lifecycles, and component lifecycles to any supported target platform."
+---
+
+## Overview
+
+`@morjs/runtime-mini` provides the runtime shim layer that allows a mini-program written for one platform (Alipay or WeChat) to run on a different native platform without source changes. It is injected automatically by the MorJS compiler.
+
+| Property | Value |
+|---|---|
+| **Package** | `@morjs/runtime-mini` |
+| **Source platforms** | `alipay`, `wechat` |
+| **Target platforms** | `alipay`, `wechat`, `baidu`, `bytedance`, `qq`, `kuaishou` |
+
+## Installation
+
+```bash
+npm install @morjs/runtime-mini
+```
+
+## Primary export
+
+### `initAdapters`
+
+Initialises all runtime adapters needed to translate the source platform's APIs, page lifecycles, and component lifecycles to the target platform.
+
+```ts
+function initAdapters(options: InitAdapterOptions): void
+
+interface InitAdapterOptions {
+  sourceType: 'alipay' | 'wechat'
+  target: string
+  createApi: (
+    api?: any,
+    options?: any
+  ) => { override: () => any } & Record<string, any>
+  registerComponentAdapters: (adapters?: any[]) => void
+  registerPageAdapters: (adapters?: any[]) => void
+}
+```
+
+<ParamField path="options.sourceType" type="'alipay' | 'wechat'" required>
+  The DSL the source code was written in.
+</ParamField>
+
+<ParamField path="options.target" type="string" required>
+  The target runtime platform.
+</ParamField>
+
+<ParamField path="options.createApi" type="function" required>
+  Factory function that wraps the platform's global API object and returns an `override()` method to install the translation layer.
+</ParamField>
+
+<ParamField path="options.registerComponentAdapters" type="function" required>
+  Reference to `registerComponentAdapters` from `@morjs/core`.
+</ParamField>
+
+<ParamField path="options.registerPageAdapters" type="function" required>
+  Reference to `registerPageAdapters` from `@morjs/core`.
+</ParamField>
+
+<Note>
+`initAdapters` returns immediately without registering any adapters when `sourceType === target`.
+</Note>
+
+## Platform directories
+
+Each directory inside `src/` contains adapter modules for a specific cross-platform translation direction.
+
+### `alipay/`
+
+Adapters for Alipay source code running on other platforms.
+
+| Module | Purpose |
+|---|---|
+| `apisToAlipay` | No-op shim (source = target) |
+| `apisToOther` | Translates Alipay APIs to generic cross-platform equivalents |
+| `apisToWechat` | Alipay → WeChat API translation |
+| `componentToAlipay` | Translates other platform component options to Alipay format |
+| `componentToOther` | Translates Alipay component options to other platforms |
+| `pageToAlipay` | Translates page options to Alipay format |
+| `pageToOther` | Translates Alipay page options to other platforms |
+
+### `wechat/`
+
+Adapters for WeChat source code running on other platforms.
+
+| Module | Purpose |
+|---|---|
+| `componentToOther` | Translates WeChat component options to Kuaishou and similar |
+| `pageToOther` | Translates WeChat page options to Kuaishou and similar |
+
+### `baidu/`
+
+| Module | Purpose |
+|---|---|
+| `apis` | API translation layer for Baidu Smart Mini-Program |
+
+### `bytedance/`
+
+| Module | Purpose |
+|---|---|
+| `apis` | API translation layer for ByteDance (Douyin / Toutiao) mini-programs |
+
+### `qq/`
+
+| Module | Purpose |
+|---|---|
+| `apis` | API translation layer for QQ mini-programs |
+
+### `kuaishou/`
+
+| Module | Purpose |
+|---|---|
+| `apis` | API translation layer for Kuaishou mini-programs |
+
+### `common/`
+
+Shared utilities and helpers used by multiple adapter modules.
+
+## Adapter selection matrix
+
+The table below shows which adapters `initAdapters` activates for each source/target combination.
+
+| Source | Target | API adapter | Component adapter | Page adapter |
+|---|---|---|---|---|
+| `alipay` | `wechat` | `apisToWechat` + `apisToOther` | `alipayComponentToOther` | `alipayPageToOther` |
+| `alipay` | `baidu` | `apisToBaidu` + `apisToOther` | `alipayComponentToOther` | `alipayPageToOther` |
+| `alipay` | `bytedance` | `apisToByteDance` + `apisToOther` | `alipayComponentToOther` | `alipayPageToOther` |
+| `alipay` | `qq` | `apisToQQ` + `apisToOther` | `alipayComponentToOther` | `alipayPageToOther` |
+| `alipay` | `kuaishou` | `apisToKuaishou` + `apisToOther` | `alipayComponentToOther` | `alipayPageToOther` |
+| `wechat` | `alipay` | `apisToAlipay` | `otherComponentToAlipay` | `pageToAlipay` |
+| `wechat` | `baidu` | `apisToBaidu` | — | — |
+| `wechat` | `bytedance` | `apisToByteDance` | `otherComponentToAlipay` | `pageToAlipay` |
+| `wechat` | `qq` | `apisToQQ` | — | — |
+| `wechat` | `kuaishou` | `apisToKuaishou` | `wechatComponentToOther` | `wechatPageToOther` |

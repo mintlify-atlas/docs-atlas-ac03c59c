@@ -1,0 +1,259 @@
+---
+title: Plugins
+description: Using official MorJS plugins to extend the compiler with analysis, mocking, composition, and code generation.
+---
+
+## Adding plugins to your config
+
+Plugins are passed in the `plugins` array of a config entry. Each plugin is an instance of a class that implements the `Plugin` interface.
+
+```typescript mor.config.ts
+import { defineConfig } from '@morjs/cli'
+import MyCustomPlugin from './plugins/my-plugin'
+
+export default defineConfig({
+  name: 'alipay',
+  sourceType: 'alipay',
+  target: 'alipay',
+  plugins: [
+    new MyCustomPlugin()
+  ]
+})
+```
+
+## Official plugins
+
+All official plugins are bundled inside `@morjs/cli` and do not need to be installed separately. They register their own CLI commands and configuration schemas automatically.
+
+<CardGroup cols={2}>
+  <Card title="@morjs/plugin-analyzer" icon="chart-bar">
+    Bundle size analysis via `webpack-bundle-analyzer`.
+  </Card>
+  <Card title="@morjs/plugin-mocker" icon="flask">
+    API mock layer injected at compile time for development.
+  </Card>
+  <Card title="@morjs/plugin-composer" icon="puzzle-piece">
+    Assembles multiple independently compiled subpackages into a host app.
+  </Card>
+  <Card title="@morjs/plugin-generator" icon="wand-magic-sparkles">
+    Scaffolding generator used by `mor create`.
+  </Card>
+</CardGroup>
+
+---
+
+## `@morjs/plugin-analyzer`
+
+Adds a standalone `mor analyze` command that runs a bundle analysis on your project. It internally triggers `mor compile` in `bundle` mode with `webpack-bundle-analyzer` enabled, writing output to `dist/analyzer`.
+
+### CLI usage
+
+```bash
+# Start an interactive server (default)
+mor analyze
+
+# Output a static HTML report
+mor analyze --mode static --report-filename report.html
+
+# Output a JSON stats file
+mor analyze --mode json --stats-filename stats.json
+
+# Use with a named config in multi-config setups
+mor analyze --name alipay
+```
+
+### Config usage
+
+The analyzer can also be triggered inline via the `analyzer` field in `mor.config.ts`:
+
+```typescript
+{
+  analyzer: {
+    analyzerMode: 'static',
+    reportFilename: 'report.html',
+    openAnalyzer: false
+  }
+}
+```
+
+Or simply pass `true` to use defaults:
+
+```typescript
+{
+  analyzer: true
+}
+```
+
+---
+
+## `@morjs/plugin-mocker`
+
+Injects a mock runtime into the compiled output during development. Mock files are loaded from a configurable directory using `require.context`.
+
+### Enabling mocks
+
+Pass `--mock` on the CLI (only active in non-production mode):
+
+```bash
+mor compile -w --mock
+```
+
+<Warning>
+  Mock mode is automatically disabled when `mode` is `production` or `--production` is passed.
+</Warning>
+
+### Configuration
+
+```typescript mor.config.ts
+{
+  mock: {
+    // Directory containing mock files (default: './mock')
+    path: './mock',
+
+    // Print debug info
+    debug: false,
+
+    // Adapter plugins for custom mock behaviour
+    adapters: [
+      './mock/adapters/my-adapter',
+      ['./mock/adapters/configured-adapter', { timeout: 500 }]
+    ],
+
+    // APIs that should always use the native implementation
+    originMap: {
+      alipay: ['my.navigateTo']
+    }
+  }
+}
+```
+
+### Mock file format
+
+Place mock files in your `mock/` directory. Each file exports mock responses keyed by API name:
+
+```javascript mock/request.js
+export default {
+  'POST /api/user': { id: 1, name: 'Test User' },
+  'GET /api/list': { items: [], total: 0 }
+}
+```
+
+---
+
+## `@morjs/plugin-composer`
+
+Orchestrates multi-repo mini-program projects by downloading, compiling (or copying), and assembling subpackages into a host application.
+
+### `mor compose` command
+
+```bash
+mor compose
+mor compose --target alipay
+mor compose --target wechat --output-path dist/wechat
+```
+
+### Configuration
+
+Add a `host` and `modules` array to your config:
+
+```typescript mor.config.ts
+import { defineConfig } from '@morjs/cli'
+
+export default defineConfig({
+  name: 'alipay',
+  target: 'alipay',
+
+  // Enable composer in compile command as well
+  compose: false,
+
+  host: {
+    // Local host project
+    file: './host'
+  },
+
+  modules: [
+    {
+      name: 'feature-a',
+      type: 'subpackage',
+      // Download from npm
+      npm: {
+        name: '@my-org/feature-a',
+        version: 'latest'
+      },
+      // Or from git
+      // git: { url: 'https://github.com/org/repo.git', branch: 'main' },
+      mode: 'compose',  // 'compose' (copy) or 'compile' (run mor compile)
+      scripts: {
+        before: ['npm install'],
+        after: []
+      }
+    },
+    {
+      name: 'feature-b',
+      type: 'main',
+      file: '../feature-b/dist/alipay',
+      mode: 'compose'
+    }
+  ]
+})
+```
+
+### Module types
+
+| Type | Description |
+|------|-------------|
+| `subpackage` | Pages are inserted into `app.json` `subPackages`. |
+| `main` | Pages are inserted into `app.json` `pages`. |
+| `plugin` | Plugin config is fetched and route support is written. |
+
+### Integration modes
+
+| Mode | Description |
+|------|-------------|
+| `compose` | Copy pre-built artefacts directly to the output directory. |
+| `compile` | Run the full `mor compile` pipeline on the module source. |
+
+---
+
+## `@morjs/plugin-generator`
+
+Provides the template scaffolding used by `mor create`. It is invoked automatically by the `create` command and is not typically configured directly.
+
+### Usage
+
+```bash
+mor create my-app
+```
+
+The generator guides you through an interactive prompt to select a template (Alipay mini-program, WeChat mini-program, etc.) and writes the starter files.
+
+---
+
+## Writing a custom plugin
+
+A MorJS plugin is a class with a `name` property and an `apply(runner)` method. Use runner hooks to intercept and modify the compilation pipeline.
+
+```typescript mor.config.ts
+import { defineConfig, logger, Plugin, Runner } from '@morjs/cli'
+
+class MyPlugin implements Plugin {
+  name = 'MyPlugin'
+
+  apply(runner: Runner) {
+    // Transform every compiled template
+    runner.hooks.templateParser.tap(this.name, (tree) => {
+      return tree.walk((node) => {
+        // Modify nodes here
+        return node
+      })
+    })
+  }
+}
+
+export default defineConfig({
+  name: 'alipay',
+  sourceType: 'wechat',
+  target: 'alipay',
+  plugins: [new MyPlugin()]
+})
+```

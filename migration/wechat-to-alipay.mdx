@@ -1,0 +1,287 @@
+---
+title: WeChat to Alipay
+description: Compile WeChat mini-program source code to run on Alipay using MorJS.
+---
+
+MorJS can take a WeChat mini-program codebase and compile it to a fully functional Alipay mini-program. The compiler rewrites file extensions, transforms template directives, renames the global object, and injects a runtime shim that bridges API differences at runtime.
+
+## Configuration
+
+Set `sourceType` to `wechat` and `target` to `alipay` in your `mor.config.ts`:
+
+```ts
+// mor.config.ts
+import { defineConfig } from '@morjs/cli'
+
+export default defineConfig([
+  {
+    name: 'alipay',
+    sourceType: 'wechat',   // source DSL is WeChat
+    target: 'alipay',       // compile to Alipay
+    compileMode: 'bundle',
+  }
+])
+```
+
+<Note>
+  `sourceType` defaults to `wechat`. If your project only has `.wxml` files and
+  no `.axml` files, MorJS will auto-detect the DSL without an explicit setting.
+</Note>
+
+## File Extension Mapping
+
+The compiler rewrites every source file extension to the Alipay equivalent:
+
+| WeChat | Alipay | Purpose |
+|--------|--------|---------|
+| `.wxml` | `.axml` | Template |
+| `.wxss` | `.acss` | Styles |
+| `.wxs`  | `.sjs`  | Script modules |
+| `.js`   | `.js`   | Page / component logic |
+| `.json` | `.json` | Configuration |
+
+The default output directory is `dist/alipay`.
+
+## Global Object: `wx` → `my`
+
+Alipay exposes its API through `my`; WeChat uses `wx`. MorJS handles this
+transformation at compile time through the `autoInjectRuntime.api` setting,
+which accepts one of three modes defined in `GlobalObjectTransformTypes`:
+
+<AccordionGroup>
+  <Accordion title="enhanced (default for cross-platform builds)">
+    Replaces `wx` with a MorJS proxy object (`mor`) and inserts a
+    `import`-style injection at the top of each script file. The proxy holds a
+    fully normalised API surface that maps WeChat calls to Alipay equivalents,
+    including argument renaming, promise wrapping, and return-value mapping.
+
+    ```ts
+    autoInjectRuntime: {
+      api: 'enhanced'
+    }
+    ```
+
+    This is the recommended mode. It enables the runtime API transform table
+    described in the [API Differences](#api-differences) section below.
+  </Accordion>
+
+  <Accordion title="lite">
+    A lightweight textual replacement: every occurrence of the identifier `wx`
+    is replaced with `my`. No additional import is injected. Use this when your
+    code calls only APIs that have identical signatures on both platforms.
+
+    ```ts
+    autoInjectRuntime: {
+      api: 'lite'
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="minimal">
+    Only replaces `wx.<method>()` call expressions — bare references like
+    `const g = wx` are left untouched.
+
+    ```ts
+    autoInjectRuntime: {
+      api: 'minimal'
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Template Directive Mapping
+
+WeChat template directives (`wx:`) are rewritten to Alipay directives (`a:`) at
+compile time:
+
+| WeChat directive | Alipay directive |
+|------------------|------------------|
+| `wx:if` | `a:if` |
+| `wx:elif` | `a:elif` |
+| `wx:else` | `a:else` |
+| `wx:for` | `a:for` |
+| `wx:for-item` | `a:for-item` |
+| `wx:for-index` | `a:for-index` |
+| `wx:key` | `a:key` |
+
+Script module tags are also renamed:
+
+| WeChat | Alipay |
+|--------|--------|
+| `<wxs src="..." module="m">` | `<import-sjs from="..." name="m" />` |
+
+<Note>
+  Alipay's `<import-sjs>` tag does **not** support inline script content
+  (`isSupportSjsContent: false`). Split any inline `<wxs>` blocks into
+  separate `.sjs` files before migrating.
+</Note>
+
+## Runtime Injection: `autoInjectRuntime`
+
+In `enhanced` mode, MorJS replaces the WeChat constructor calls with its own
+runtime wrappers so that Alipay-specific lifecycle conventions are satisfied
+automatically:
+
+| WeChat call | Injected MorJS runtime |
+|-------------|------------------------|
+| `App({})` | `aApp({})` from `@morjs/runtime-mini` |
+| `Page({})` | `aPage({})` |
+| `Component({})` | `aComponent({})` |
+| `Behavior({})` | mapped to Alipay `Mixin({})` via `behaviorOrMixin` |
+
+You can selectively disable injection per entity:
+
+```ts
+autoInjectRuntime: {
+  app: true,
+  page: true,
+  component: true,
+  behavior: true,  // Behavior → Mixin for Alipay targets
+  api: 'enhanced'
+}
+```
+
+## API Differences
+
+The `enhanced` runtime (`apisToAlipay.ts`) translates the following WeChat APIs
+to their Alipay equivalents automatically. No code changes are required in your
+source.
+
+<Tabs>
+  <Tab title="UI">
+    | WeChat API | Alipay API | Notes |
+    |------------|-----------|-------|
+    | `wx.showActionSheet({ itemList })` | `my.showActionSheet({ items })` | Parameter renamed |
+    | `wx.showToast({ title, icon })` | `my.showToast({ content, type })` | `icon: 'loading'` delegates to `my.showLoading` |
+    | `wx.showLoading({ title })` | `my.showLoading({ content })` | Parameter renamed |
+    | `wx.showModal()` | `my.confirm()` / `my.alert()` | `showCancel: false` uses `alert` |
+    | `wx.setNavigationBarTitle` | `my.setNavigationBar` | Mapped |
+    | `wx.setNavigationBarColor` | `my.setNavigationBar` | Mapped; front color auto-derived from background |
+    | `wx.previewImage({ current, urls })` | `my.previewImage({ current (index), urls })` | `current` converted from URL to numeric index |
+  </Tab>
+  <Tab title="Storage">
+    | WeChat API | Alipay API | Notes |
+    |------------|-----------|-------|
+    | `wx.getStorageSync(key)` | `my.getStorageSync({ key })` | Alipay uses object argument |
+    | `wx.setStorageSync(key, data)` | `my.setStorageSync({ key, data })` | Alipay uses object argument |
+    | `wx.removeStorageSync(key)` | `my.removeStorageSync({ key })` | Alipay uses object argument |
+  </Tab>
+  <Tab title="Network">
+    | WeChat API | Alipay API | Notes |
+    |------------|-----------|-------|
+    | `wx.request({ header })` | `my.request({ headers })` | Field renamed; `statusCode`→`status`, `header`→`headers` in response |
+    | `wx.uploadFile({ name })` | `my.uploadFile({ fileName })` | Parameter renamed |
+    | `wx.downloadFile` | `my.downloadFile` | Response `tempFilePath`↔`apFilePath` |
+  </Tab>
+  <Tab title="Auth / User">
+    | WeChat API | Alipay API | Notes |
+    |------------|-----------|-------|
+    | `wx.login()` | `my.getAuthCode({ scopes: ['auth_base'] })` | Code mapped: `res.code`←`res.authCode` |
+    | `wx.getUserInfo()` | `my.getOpenUserInfo()` | Response shape normalised |
+    | `wx.getUserProfile()` | `my.getOpenUserInfo()` | Response shape normalised |
+  </Tab>
+  <Tab title="Device">
+    | WeChat API | Alipay API | Notes |
+    |------------|-----------|-------|
+    | `wx.scanCode` | `my.scan` | `scanType` ↔ `type`; result field `result`←`code` |
+    | `wx.makePhoneCall({ phoneNumber })` | `my.makePhoneCall({ number })` | Parameter renamed |
+    | `wx.getClipboardData` | `my.getClipboard` | Response: `data`←`text` |
+    | `wx.setClipboardData({ data })` | `my.setClipboard({ text })` | Parameter renamed |
+    | `wx.setScreenBrightness({ value })` | `my.setScreenBrightness({ brightness })` | Parameter renamed |
+    | `wx.getScreenBrightness` | `my.getScreenBrightness` | Response: `value`←`brightness` |
+    | `wx.saveImageToPhotosAlbum({ filePath })` | `my.saveImage({ url })` | Parameter renamed |
+  </Tab>
+  <Tab title="BLE">
+    | WeChat API | Alipay API |
+    |------------|------------|
+    | `wx.onBLEConnectionStateChange` | `my.onBLEConnectionStateChanged` |
+    | `wx.offBLEConnectionStateChange` | `my.offBLEConnectionStateChanged` |
+    | `wx.createBLEConnection` | `my.connectBLEDevice` |
+    | `wx.closeBLEConnection` | `my.disconnectBLEDevice` |
+    | `wx.onBLECharacteristicValueChange` | Converts hex string → ArrayBuffer |
+    | `wx.writeBLECharacteristicValue` | Converts ArrayBuffer → hex string |
+  </Tab>
+</Tabs>
+
+## Component Lifecycle Mapping
+
+WeChat and Alipay components have different lifecycle names. The `aComponent`
+runtime maps them:
+
+| WeChat | Alipay |
+|--------|--------|
+| `created` | `onInit` |
+| `attached` | `didMount` (via composed lifecycle) |
+| `ready` | `didMount` |
+| `detached` | `didUnmount` |
+| `error` | `onError` |
+
+The `Behavior({})` constructor is mapped to Alipay's `Mixin({})` via the
+`behaviorOrMixin` runtime module.
+
+## Common Gotchas
+
+<AccordionGroup>
+  <Accordion title="Inline wxs content is not supported">
+    Alipay's `<import-sjs>` tag cannot contain inline script. Any WeChat page
+    that embeds JS inside a `<wxs>` tag must have that code extracted into a
+    separate `.sjs` file and referenced with `from=`.
+  </Accordion>
+
+  <Accordion title="style prop on custom components">
+    Alipay does not support a raw `style` prop on custom components.
+    MorJS automatically renames `style` → `morStyle` on component nodes and
+    adds a corresponding observer that copies the value back. Avoid passing
+    computed style strings directly as `style` to custom components — use a
+    wrapper view instead.
+  </Accordion>
+
+  <Accordion title="Module resolution order">
+    The Alipay compiler resolves npm package `main` fields in the order:
+    `alipay` → `module` → `main`. Ensure any cross-platform component library
+    you depend on exports an `alipay` field in its `package.json` or the
+    correct file will be missing.
+  </Accordion>
+
+  <Accordion title="Script target and module format">
+    Alipay compiles scripts to **ES2015** with **ESNext** module syntax by
+    default, whereas WeChat uses **ES5** + **CommonJS**. Libraries that ship
+    only CommonJS bundles may need to be processed via `processNodeModules`.
+  </Accordion>
+
+  <Accordion title="Component styleIsolation">
+    Alipay does not support setting `styleIsolation` through the `Component`
+    constructor options. Set it in the component's `.json` file instead:
+
+    ```json
+    {
+      "component": true,
+      "styleIsolation": "shared"
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="createSelectorQuery().in() is a no-op">
+    `wx.createSelectorQuery().in(component)` scopes query results to a
+    component. Alipay's equivalent does not take a component argument;
+    the runtime shim keeps the `.in()` method but it has no effect.
+    Queries will search the full page tree.
+  </Accordion>
+</AccordionGroup>
+
+## Conditional Compilation
+
+Use MorJS conditional compilation to ship platform-specific code in the same
+source file:
+
+```js
+// @morjs/cli strips blocks that don't match the current target
+/* #if TARGET === 'alipay' */
+my.alert({ content: 'Alipay only' })
+/* #elif TARGET === 'wechat' */
+wx.showModal({ title: 'WeChat only' })
+/* #end */
+```
+
+File-level conditional compilation is also supported via the `.wx.js` /
+`.my.js` suffix convention configured in `conditionalCompile.fileExt`.

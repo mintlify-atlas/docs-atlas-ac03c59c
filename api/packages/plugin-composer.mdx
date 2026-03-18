@@ -1,0 +1,140 @@
+---
+title: "@morjs/plugin-composer"
+description: "Multi-module composition plugin for MorJS. Integrates multiple independent mini-program modules into a single deployable application."
+---
+
+## Overview
+
+`@morjs/plugin-composer` implements the `compose` command. It orchestrates the download, build, and assembly of multiple mini-program modules (sub-apps, sub-packages, and plugins) into one host application directory.
+
+| Property | Value |
+|---|---|
+| **Package** | `@morjs/plugin-composer` |
+| **Version** | `1.0.72` |
+| **Command** | `mor compose` |
+
+## Installation
+
+```bash
+npm install --save-dev @morjs/plugin-composer
+```
+
+## Usage
+
+```ts
+import takin from '@morjs/takin'
+import MorComposerPlugin from '@morjs/plugin-composer'
+
+const cli = takin('mor')
+cli.use([new MorComposerPlugin()])
+
+await cli.run(
+  { name: 'compose', options: { target: 'wechat' } },
+  [{ sourceType: 'alipay', target: 'wechat', modules: [...] }]
+)
+```
+
+Or from the CLI:
+
+```bash
+mor compose --target wechat
+mor compose --target alipay --with-modules moduleA,moduleB
+mor compose --from-state 2 --to-state 4
+```
+
+## `MorComposerPlugin`
+
+The default export. Implements the Takin `Plugin` interface.
+
+```ts
+export default class MorComposerPlugin implements Plugin {
+  name = 'MorComposerPlugin'
+  apply(runner: Runner): void
+}
+```
+
+Registering this plugin adds:
+
+- The `compose` CLI command.
+- A `--compose` flag to the existing `compile` command (via `AddComposeToCompilerPlugin`).
+- `--with-modules` / `--without-modules`, `--from-state` / `--to-state`, and `--concurrency` options to both commands.
+- Automatic loading of module `scripts` and `dist` paths from each module's `package.json`.
+- Automatic copying of host project config files to the compose output directory.
+
+## What composition does
+
+Composition merges multiple independently-developed mini-program modules into a single host application. Each module can be sourced from:
+
+- A local directory (`mode: 'local'`)
+- A Git repository (`git: { url, branch }`)
+- An npm package (`npm: { name, version }`)
+- A tarball URL (`tar: { url }`)
+- A pre-built `dist` directory
+
+The composer resolves each module in dependency order, runs configured build scripts, and assembles the final output directory structure (app.json, pages, sub-packages, etc.).
+
+## CLI options
+
+| Option | Description |
+|---|---|
+| `-t, --target <target>` | Compile target platform (e.g. `wechat`, `alipay`) |
+| `-o, --output-path <dir>` | Output directory |
+| `--compile-type <compileType>` | Compile form: `miniprogram`, `subpackage`, or `plugin` |
+| `--with-modules <modules>` | Comma-separated list of modules to include |
+| `--without-modules <modules>` | Comma-separated list of modules to exclude |
+| `--from-state <state>` | Start composing from this `ComposeModuleState` |
+| `--to-state <state>` | Stop composing at this `ComposeModuleState` |
+| `--concurrency <n>` | Max number of modules to process in parallel |
+
+## `ComposerUserConfig`
+
+The user-facing configuration type for the `compose` command.
+
+<ResponseField name="sourceType" type="'alipay' | 'wechat'" required>
+  DSL source type of the host project.
+</ResponseField>
+
+<ResponseField name="target" type="string">
+  Target platform for the compose output.
+</ResponseField>
+
+<ResponseField name="outputPath" type="string">
+  Directory where the composed application is written.
+</ResponseField>
+
+<ResponseField name="compileType" type="string">
+  Whether the host is a `miniprogram`, `subpackage`, or `plugin`.
+</ResponseField>
+
+<ResponseField name="modules" type="ModuleConfig[]">
+  Array of module definitions to integrate. Each entry describes a module's source (git, npm, tar, dist, or local), build scripts, and placement in the output app.
+</ResponseField>
+
+<ResponseField name="combineModules" type="boolean">
+  When `true`, all modules are combined into a single output directory rather than each occupying a sub-package.
+</ResponseField>
+
+## Exported utilities
+
+### `generateComposeModuleHash`
+
+Generates a deterministic MD5 hash from a module's source configuration. Used to detect whether a module needs to be re-downloaded.
+
+```ts
+function generateComposeModuleHash(
+  options: BaseModuleSchemaType,
+  name: string
+): string
+```
+
+<ParamField path="options" type="BaseModuleSchemaType" required>
+  The module configuration object. Only the `git`, `npm`, `tar`, `dist`, and `mode` fields contribute to the hash.
+</ParamField>
+
+<ParamField path="name" type="string" required>
+  Module name used in debug log output.
+</ParamField>
+
+<ResponseField name="return" type="string">
+  32-character lowercase hexadecimal MD5 hash.
+</ResponseField>

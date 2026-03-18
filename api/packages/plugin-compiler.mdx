@@ -1,0 +1,169 @@
+---
+title: "@morjs/plugin-compiler"
+description: "Webpack-based multi-target compiler plugin for MorJS. Compiles Alipay or WeChat mini-program source code to any supported target platform."
+---
+
+## Overview
+
+`@morjs/plugin-compiler` is the core build plugin for MorJS. It registers the `compile` CLI command, builds a Webpack configuration from user config, transforms source files through platform-specific parser plugins, and bundles the output for the requested target platform.
+
+| Property | Value |
+|---|---|
+| **Package** | `@morjs/plugin-compiler` |
+| **Version** | `1.0.113` |
+| **Command** | `mor compile` |
+
+## Installation
+
+```bash
+npm install --save-dev @morjs/plugin-compiler
+```
+
+## Usage
+
+Register the plugin on a `Takin` instance:
+
+```ts
+import takin from '@morjs/takin'
+import MorCompilerPlugin from '@morjs/plugin-compiler'
+
+const cli = takin('mor')
+cli.use([new MorCompilerPlugin()])
+
+await cli.run(
+  { name: 'compile', options: { target: 'wechat' } },
+  [{ sourceType: 'alipay', target: 'wechat', srcPath: 'src' }]
+)
+```
+
+Or run from the command line via `@morjs/cli`:
+
+```bash
+mor compile --target wechat
+mor compile --target alipay --watch
+```
+
+## `MorCompilerPlugin`
+
+The default export. Implements the Takin `Plugin` interface.
+
+```ts
+export default class MorCompilerPlugin implements Plugin {
+  name = 'MorCompilerPlugin'
+  apply(runner: Runner): void
+}
+```
+
+When `apply` is called, `MorCompilerPlugin` instantiates an internal `MorCompile` object that:
+
+1. Registers the `compile` CLI command with all supported target options.
+2. Applies parser plugins for config, script, style, template, and SJS files.
+3. Applies optimisation and injection plugins (alias, define, runtime inject, split chunks, etc.).
+4. Applies all compiler plugins returned by `getComposedCompilerPlugins()`.
+5. Hooks into the `userConfigValidated` stage to apply default config and build the Webpack configuration.
+
+## Exported utilities
+
+### `applyDefaults`
+
+Applies MorJS-managed default values to a `CompilerUserConfig` object. Called automatically during `userConfigValidated`.
+
+```ts
+function applyDefaults(config: Config, userConfig: CompilerUserConfig): void
+```
+
+### `COMPILE_LOADERS`
+
+An object containing all webpack loader configurations used by the compiler. Exposed so that third-party plugins can reference or extend them.
+
+```ts
+export { COMPILE_LOADERS }
+```
+
+Access it from a runner via the shared method `getCompilerLoaders`:
+
+```ts
+runner.hooks.beforeRun.tapPromise('MyPlugin', async (runner) => {
+  const loaders = runner.methods.invoke('getCompilerLoaders')
+})
+```
+
+### `preprocess`
+
+A code preprocessor function that evaluates conditional compilation directives (`#ifdef`, `#ifndef`, `#endif`) in source files.
+
+```ts
+function preprocess(source: string, conditions: Record<string, boolean>): string
+```
+
+<ParamField path="source" type="string" required>
+  The source code string to preprocess.
+</ParamField>
+
+<ParamField path="conditions" type="Record<string, boolean>" required>
+  A map of condition names to boolean values used to evaluate directives.
+</ParamField>
+
+### `getAllCompilerTargets`
+
+Returns an array of all registered target platform identifiers (e.g. `'wechat'`, `'alipay'`, `'baidu'`, `'bytedance'`, `'qq'`, `'kuaishou'`).
+
+```ts
+function getAllCompilerTargets(): string[]
+```
+
+### `getComposedCompilerPlugins`
+
+Returns the merged set of all registered compiler plugins, keyed by plugin name and target description.
+
+```ts
+function getComposedCompilerPlugins(): {
+  Plugin: Record<string, new () => Plugin>
+  targetDescription: Record<string, string>
+}
+```
+
+Access it from a runner via the shared method `getComposedCompilerPlugins`:
+
+```ts
+const plugins = runner.methods.invoke('getComposedCompilerPlugins')
+```
+
+## `CompilerUserConfig`
+
+The user-facing configuration type for the `compile` command. Key fields:
+
+<ResponseField name="sourceType" type="'alipay' | 'wechat'" required>
+  DSL source type of the project being compiled.
+</ResponseField>
+
+<ResponseField name="target" type="string" required>
+  Compilation target platform. Must be one of the values returned by `getAllCompilerTargets()`.
+</ResponseField>
+
+<ResponseField name="srcPath" type="string">
+  Source directory. Defaults to `'src'`.
+</ResponseField>
+
+<ResponseField name="outputPath" type="string">
+  Output directory. Defaults to `dist/<target>`.
+</ResponseField>
+
+<ResponseField name="watch" type="boolean">
+  Enable file-watch mode. Equivalent to `--watch` on the CLI.
+</ResponseField>
+
+<ResponseField name="compileMode" type="string">
+  Compilation mode: `'bundle'` (default) or `'transform'`.
+</ResponseField>
+
+<ResponseField name="plugins" type="Plugin[]">
+  Additional Takin plugins to load for this compilation run.
+</ResponseField>
+
+## Runner methods registered
+
+| Method name | Returns | Description |
+|---|---|---|
+| `getCompilerLoaders` | `typeof COMPILE_LOADERS` | All webpack loader configs |
+| `getComposedCompilerPlugins` | `ComposedCompilerPlugins` | All registered compiler plugins |

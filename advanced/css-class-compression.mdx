@@ -1,0 +1,206 @@
+---
+title: 'CSS class compression'
+description: 'Reduce mini-program package size by compressing CSS class names at compile time using the experiments.compressCssClassName option.'
+---
+
+CSS class name compression renames verbose class names (e.g., `.my-component-button--primary`) to short identifiers (e.g., `.a`, `.b`, `.aB`) in both template files and style files during compilation. This reduces the size of template and CSS output in mini-program packages.
+
+<Warning>
+  This feature is experimental. It is implemented in `packages/plugin-compiler/src/experiments/cssClassnameCompress.ts`.
+</Warning>
+
+## Enabling compression
+
+Set `experiments.compressCssClassName` to `true` for defaults, or to a configuration object for fine-grained control:
+
+```typescript
+// mor.config.ts
+export default defineConfig([
+  {
+    target: 'alipay',
+    experiments: {
+      compressCssClassName: true
+    }
+  }
+])
+```
+
+## Configuration options
+
+```typescript
+experiments: {
+  compressCssClassName: {
+    // Compression strategy. Currently only 'lite' is supported.
+    strategy: 'lite',
+
+    // Prefix prepended to every compressed class name. Default: ''
+    prefix: '',
+
+    // Suffix appended to every compressed class name. Default: ''
+    surfix: '',
+
+    // Only compress files whose paths match one of these RegExps.
+    // An empty array means all files are included.
+    include: [],
+
+    // Skip files whose paths match one of these RegExps.
+    // Takes priority over include.
+    exclude: [],
+
+    // Class names that must never be renamed.
+    except: ['van-icon', 'iconfont'],
+
+    // Character set used to generate compressed names.
+    // Default: '_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
+    // When prefix is empty, the safe alphabet (letters only) is used automatically.
+    alphabet: 'abcdefghijklmnopqrstuvwxyz',
+
+    // Additional template attributes to treat as class-like.
+    // 'class' is always included.
+    customAttributeNames: ['innerClass', 'wrapClass'],
+
+    // Return false to skip compression for a specific class name or file.
+    // (className: string, filePath: string) => boolean
+    classNameFilter: (className, filePath) => {
+      return !className.startsWith('js-')
+    },
+
+    // Control dynamic class detection.
+    // When false (default): files containing {{}} class bindings are skipped.
+    // When true: all files are compressed regardless of dynamic bindings.
+    // When a function: return true to compress even when dynamic bindings exist.
+    // (filePath: string) => boolean
+    disableDynamicClassDetection: false,
+
+    // Called after all files are processed.
+    // Receives the complete old-name → new-name mapping.
+    success: (classNameMappings: Map<string, string>) => {
+      console.log('Compressed', classNameMappings.size, 'class names')
+    }
+  }
+}
+```
+
+## Option reference
+
+<AccordionGroup>
+  <Accordion title="strategy">
+    The compression algorithm to use. Currently only `'lite'` is supported.
+
+    In `lite` mode the compiler:
+    - Skips `app.acss` (and equivalent global style files) entirely — class names defined there are added to the exclusion list.
+    - Skips template files that contain dynamic class bindings such as `class="prefix-{{condition}}"` and their corresponding style files.
+  </Accordion>
+
+  <Accordion title="prefix and surfix">
+    `prefix` is prepended and `surfix` is appended to every generated class name.
+
+    ```typescript
+    prefix: 'm-',
+    surfix: ''
+    // Result: .m-a, .m-b, .m-aB ...
+    ```
+
+    When `prefix` is empty, the generator automatically uses a letter-only alphabet to ensure the first character of a class name is never a digit or underscore (which would be invalid CSS).
+  </Accordion>
+
+  <Accordion title="include and exclude">
+    Both accept an array of `RegExp` objects. `exclude` takes priority over `include`.
+
+    ```typescript
+    include: [/src\/components/],
+    exclude: [/src\/components\/legacy/]
+    ```
+
+    This compresses only files under `src/components`, except those under `src/components/legacy`.
+  </Accordion>
+
+  <Accordion title="except">
+    An array of class name strings that are never renamed. Use this for class names that are referenced dynamically at runtime, in third-party component libraries, or injected from outside the mini-program.
+
+    ```typescript
+    except: ['van-button', 'van-icon', 'iconfont']
+    ```
+  </Accordion>
+
+  <Accordion title="alphabet">
+    The set of characters used when generating compressed names. Defaults to:
+
+    ```
+    _abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789
+    ```
+
+    The generator starts with length-1 names, then increments length as the namespace fills up (at 80% capacity).
+  </Accordion>
+
+  <Accordion title="customAttributeNames">
+    Some component libraries use custom class-like attributes (e.g., `inner-class`, `wrap-class`). List them here so MorJS compresses them alongside the standard `class` attribute.
+
+    ```typescript
+    customAttributeNames: ['innerClass', 'headerClass']
+    ```
+
+    ```xml
+    <!-- Before -->
+    <my-comp innerClass="my-component__inner" />
+    <!-- After -->
+    <my-comp innerClass="a" />
+    ```
+  </Accordion>
+
+  <Accordion title="classNameFilter">
+    A function `(className: string, filePath: string) => boolean`. Return `true` to compress the class name, `false` to leave it unchanged.
+
+    ```typescript
+    classNameFilter: (className, filePath) => {
+      // Skip class names used as JavaScript selectors
+      if (className.startsWith('js-')) return false
+      // Skip class names in a specific file
+      if (filePath.includes('legacy')) return false
+      return true
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="disableDynamicClassDetection">
+    By default, any template file containing a dynamic class binding like `class="{{expr}}"` is skipped entirely (along with its style file) to avoid breaking runtime class concatenation.
+
+    Set to `true` to compress all files regardless of dynamic bindings. Use a function for per-file control:
+
+    ```typescript
+    // Compress even if the file has dynamic class bindings
+    disableDynamicClassDetection: true
+
+    // Per-file: return true to force compression
+    disableDynamicClassDetection: (filePath) => {
+      return filePath.includes('/safe/')
+    }
+    ```
+
+    <Warning>
+      Enabling this for files with `class="prefix-{{variable}}"` patterns will break class name resolution at runtime, because the variable part is not compressed.
+    </Warning>
+  </Accordion>
+
+  <Accordion title="success callback">
+    Called after the webpack compilation finishes. Receives a `Map<string, string>` mapping original class names to compressed names.
+
+    ```typescript
+    success: (classNameMappings) => {
+      // Persist the mapping for use in server-side rendering or testing
+      require('fs').writeFileSync(
+        'class-map.json',
+        JSON.stringify(Object.fromEntries(classNameMappings), null, 2)
+      )
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Limitations
+
+- Only `lite` strategy is currently available.
+- Global style files (`app.acss`, `app.wxss`) are always skipped. Class names defined in them are added to the exclusion list and will not be renamed in any other file either.
+- Template files containing dynamic class bindings (`class="{{...}}"`) are skipped by default, along with their corresponding style files.
+- Compression runs with webpack `parallelism` set to `1` to guarantee that global style processing completes before per-file compression begins.
+- The feature is not supported for `web`, `web-pro`, or `weex-pro` targets.

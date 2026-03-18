@@ -1,0 +1,342 @@
+---
+title: "@morjs/takin"
+description: "The extensible command-line engine that powers MorJS tooling. Build CLI tools with a plugin-driven hook system, configuration loading, and parallel multi-config runner support."
+---
+
+## Overview
+
+Takin is the underlying framework that drives all MorJS build tooling. It provides:
+
+- A plugin system based on [tapable](https://github.com/webpack/tapable) hooks.
+- Automatic configuration file loading, validation (via [zod](https://zod.dev)), and filtering.
+- Multi-config support: run one command across multiple configurations in parallel.
+- An extensible `Runner` class whose hooks and methods can be augmented by plugins.
+
+| Property | Value |
+|---|---|
+| **Package** | `@morjs/takin` |
+| **License** | MIT |
+| **Default export** | `takin(name: string): Takin` factory function |
+
+## Installation
+
+```bash
+npm install @morjs/takin
+```
+
+## Quick start
+
+```ts
+import takin from '@morjs/takin'
+
+const cli = takin('my-tool')
+
+cli.use([myPlugin])
+
+// Run with a command parsed from process.argv
+await cli.run()
+
+// Or pass a command directly (API mode)
+await cli.run(
+  { name: 'build', options: { watch: true } },
+  [{ entry: 'src/index.ts' }]
+)
+```
+
+---
+
+## `Takin` class
+
+```ts
+class Takin extends Config {
+  readonly config: Config  // deprecated, use takin instance directly
+  readonly hooks: TakinHooks
+
+  constructor(name?: string)
+  use(plugins: PluginOption[]): void
+  run<R>(command?: CommandOptions, userConfigs?: UserConfig[], context?: RunnerContext | Record<string, any>): Promise<(R | undefined)[]>
+  reload<R>(): Promise<(R | undefined)[]>
+}
+```
+
+### `constructor`
+
+<ParamField path="name" type="string" default="DEFAULT_NAME">
+  The CLI name used in log prefixes and runner identification.
+</ParamField>
+
+### `use`
+
+Registers plugins with the Takin instance. Plugins are applied to every `Runner` that is started.
+
+```ts
+use(plugins: PluginOption[]): void
+```
+
+<ParamField path="plugins" type="PluginOption[]" required>
+  Array of plugin instances (objects implementing the `Plugin` interface), plugin factories, or `[plugin, options]` tuples.
+</ParamField>
+
+### `run`
+
+Executes a command. Internally:
+
+1. Fires `hooks.initialize`.
+2. Loads and filters user config (fires `hooks.configLoaded` and `hooks.configFiltered`).
+3. Creates one `Runner` per filtered config and runs it.
+
+```ts
+async run<R = any>(
+  command?: CommandOptions,
+  userConfigs?: UserConfig[],
+  context?: RunnerContext | Record<string, any>
+): Promise<(R | undefined)[]>
+```
+
+<ParamField path="command" type="CommandOptions">
+  Command to run. If omitted, the command is parsed from `process.argv`.
+</ParamField>
+
+<ParamField path="userConfigs" type="UserConfig[]">
+  User configurations to run against. If omitted, Takin loads `mor.config.ts` (or equivalent) from the current working directory.
+</ParamField>
+
+<ParamField path="context" type="RunnerContext | Record<string, any>">
+  Initial key-value context passed into every `Runner`. Accessible via `runner.context`.
+</ParamField>
+
+### `reload`
+
+Stops all running `Runner` instances, resets configuration, and re-runs the last command with the same arguments.
+
+```ts
+async reload<R = any>(): Promise<(R | undefined)[]>
+```
+
+---
+
+## `TakinHooks`
+
+Hooks available on every `Takin` instance.
+
+<ResponseField name="initialize" type="AsyncSeriesHook<[Takin]>">
+  Fires after `takin.run()` is called but before any configuration is loaded. Use this to register additional plugins or modify the Takin instance.
+</ResponseField>
+
+<ResponseField name="prepare" type="AsyncSeriesHook<RunnerOptions>">
+  Preparatory stage run by an isolated `Runner`. Use this to modify `RunnerOptions` before the main runners are started.
+</ResponseField>
+
+<ResponseField name="configLoaded" type="AsyncSeriesHook<[Takin, CommandOptions]>">
+  Fires after the user configuration file is loaded from disk. Not fired when `userConfigs` is passed directly to `run()`. Use this to post-process or validate the loaded config.
+</ResponseField>
+
+<ResponseField name="configFiltered" type="AsyncSeriesWaterfallHook<[UserConfig[], CommandOptions]>">
+  Fires after configs are filtered by active targets / names. The hook receives the current filtered array and must return the final array to use.
+</ResponseField>
+
+<ResponseField name="extendRunner" type="SyncWaterfallHook<[typeof Runner, RunnerOptions]>">
+  Allows replacing or sub-classing the `Runner` class used for each configuration. Tap this hook and return a `Runner` subclass to add custom properties or methods.
+</ResponseField>
+
+---
+
+## `Plugin` interface
+
+```ts
+interface Plugin {
+  name: string
+  version?: string
+  enforce?: 'pre' | 'post'
+  onUse?: (takin: Takin) => void
+  apply: (runner: Runner) => void
+}
+```
+
+<ResponseField name="name" type="string" required>
+  Unique plugin identifier used in log output and deduplication checks.
+</ResponseField>
+
+<ResponseField name="version" type="string">
+  Plugin version string. Used for debug logging.
+</ResponseField>
+
+<ResponseField name="enforce" type="'pre' | 'post'">
+  Execution order relative to other plugins.
+  - `'pre'` — runs before all normal plugins.
+  - `'post'` — runs after all normal plugins.
+  - Omitted — normal order.
+</ResponseField>
+
+<ResponseField name="onUse" type="(takin: Takin) => void">
+  Called once when the plugin is registered with `takin.use()`. Use this to register additional plugins or hook into `TakinHooks`.
+</ResponseField>
+
+<ResponseField name="apply" type="(runner: Runner) => void" required>
+  Called once per `Runner` execution. All `runner.hooks` taps should happen here.
+</ResponseField>
+
+### `PluginEnforceTypes`
+
+```ts
+const PluginEnforceTypes = { pre: 'pre', post: 'post' } as const
+```
+
+---
+
+## `Runner` class
+
+The command execution unit. One `Runner` instance is created per filtered user configuration.
+
+```ts
+class Runner<R = any> {
+  readonly runnerId: number
+  readonly hooks: RunnerHooks
+  readonly config: Config
+  readonly logger: Logger
+  readonly generator: typeof Generator
+  readonly context: RunnerContext
+  readonly methods: MethodsContainer
+
+  commandName?: string
+  commandArgs?: string[]
+  commandOptions?: Record<string, any>
+  userConfig: UserConfig
+  commandInvokedBy: 'cli' | 'api'
+
+  static run(options: RunnerOptions): Promise<Runner>
+
+  getCwd(): string
+  getResult(): R | undefined
+  getPlugins(): UsedPluginsMap
+  getCurrentPluginName(): string | undefined
+  getCommandOptions(): CommandOptions
+  getRunnerName(): string
+  addCommandAction(options: RunnerAddCommandActionOptions): void
+  async invokeCommandAction(command?: CommandOptions): Promise<void>
+}
+```
+
+### `RunnerHooks`
+
+All hooks available inside a plugin's `apply(runner)` method.
+
+| Hook | Type | Description |
+|---|---|---|
+| `initialize` | `SyncHook<Runner>` | Fires after all plugins are applied |
+| `cli` | `SyncHook<Cli>` | Build the CLI command tree |
+| `matchedCommand` | `AsyncSeriesHook<CommandOptions>` | A CLI command has been matched |
+| `loadConfig` | `AsyncSeriesHook<CommandOptions>` | Load the user config file |
+| `modifyUserConfig` | `AsyncSeriesWaterfallHook<[UserConfig, CommandOptions]>` | Modify the resolved user config |
+| `registerUserConfig` | `AsyncSeriesWaterfallHook<[AnyZodObject, Zod]>` | Register config validation schema |
+| `shouldRun` | `SyncBailHook<Runner, boolean \| undefined>` | Return `false` to abort execution |
+| `shouldValidateUserConfig` | `SyncBailHook<Runner, boolean \| undefined>` | Return `false` to skip config validation |
+| `userConfigValidated` | `AsyncSeriesHook<UserConfig>` | Config validated; safe to read `runner.userConfig` |
+| `beforeRun` | `AsyncSeriesHook<Runner>` | Just before the command action fires |
+| `run` | `HookMap<AsyncParallelHook<CommandOptions>>` | Per-command action hooks (`run.for('command:build')`) |
+| `done` | `AsyncParallelHook<Runner>` | Runner completed successfully |
+| `failed` | `AsyncSeriesHook<Error>` | Runner threw an unhandled error |
+| `shutdown` | `AsyncSeriesHook<Runner>` | Runner is being shut down (used by `reload()`) |
+
+### `RunnerOptions`
+
+```ts
+interface RunnerOptions {
+  config: Config
+  userConfig: UserConfig
+  command?: CommandOptions
+  plugins?: Plugin[]
+  context?: RunnerContext | Record<string, any>
+}
+```
+
+### Extending `Runner`
+
+Use `hooks.extendRunner` to add typed properties and methods to the `Runner` class:
+
+```ts
+// 1. Declare the type augmentation
+declare module '@morjs/takin' {
+  interface RunnerExtendable {
+    myProp: string
+    myMethod(arg: number): void
+  }
+}
+
+// 2. Provide the implementation
+cli.hooks.extendRunner.tap('MyExtension', (RunnerBase) => {
+  return class extends RunnerBase {
+    myProp = 'hello'
+    myMethod(arg: number) {
+      console.log(arg)
+    }
+  }
+})
+```
+
+### Registering custom hooks
+
+```ts
+import { registerHook, registerHooks } from '@morjs/takin'
+
+// Register a single hook factory
+registerHook('myHook', () => new AsyncSeriesHook(['runner']))
+
+// Register multiple hook factories at once
+registerHooks({
+  hookA: () => new SyncHook(['data']),
+  hookB: () => new AsyncParallelHook(['event'])
+})
+```
+
+---
+
+## Writing a plugin
+
+```ts
+import type { Plugin, Runner } from '@morjs/takin'
+
+const myPlugin: Plugin = {
+  name: 'my-plugin',
+  version: '1.0.0',
+
+  onUse(takin) {
+    // Runs when takin.use([myPlugin]) is called
+    console.log('Plugin registered with', takin.name)
+  },
+
+  apply(runner: Runner) {
+    // Register a command
+    runner.hooks.cli.tap(this.name, (cli) => {
+      cli.command('greet', 'Say hello').action(() => {
+        runner.addCommandAction({
+          name: 'greet',
+          pluginName: this.name,
+          callback() {
+            console.log('Hello from my-plugin!')
+          }
+        })
+      })
+    })
+
+    // Modify user config
+    runner.hooks.modifyUserConfig.tap(this.name, (config) => {
+      return { ...config, myOption: config.myOption ?? 'default' }
+    })
+
+    // Register config schema
+    runner.hooks.registerUserConfig.tap(this.name, (schema, z) => {
+      return schema.extend({
+        myOption: z.string().optional()
+      })
+    })
+
+    // Do work before the command action fires
+    runner.hooks.beforeRun.tapPromise(this.name, async (runner) => {
+      console.log('Working directory:', runner.getCwd())
+    })
+  }
+}
+
+export default myPlugin
+```

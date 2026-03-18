@@ -1,0 +1,94 @@
+---
+title: "Overview"
+description: "MorJS is an extensible cross-platform mini-program framework built by Ele.me. Write once in WeChat or Alipay DSL and compile to 8+ platforms."
+---
+
+## What is MorJS?
+
+MorJS (pronounced /mɔːr/, like "more") is a cross-platform mini-program development framework developed by Ele.me. It is built on top of standard mini-program DSL — you write your app once using either **WeChat** or **Alipay** mini-program syntax, and MorJS compiles that source into native output for each supported platform.
+
+MorJS covers every phase from source to build artifact through a full-lifecycle plugin system, supporting everything from basic pages and components to complex subpackages and plugins.
+
+## Key advantages
+
+<CardGroup cols={3}>
+  <Card title="Ease of use" icon="wand-magic-sparkles">
+    Use the mini-program DSL you already know — WeChat or Alipay — with no extra framework to learn. Add two packages and one config file to an existing project.
+  </Card>
+  <Card title="Standardization" icon="box">
+    Scaffolding, compilation, analysis, and multi-platform output ship out of the box in a single dependency. Compile-time and runtime normalization delivers consistent behavior across platforms.
+  </Card>
+  <Card title="Flexibility" icon="puzzle-piece">
+    Every internal capability is a plugin. Add `enforce: 'pre'` or `enforce: 'post'` to control execution order. Support for TypeScript, Less, SCSS, JSONC, and JSON5 is built in.
+  </Card>
+</CardGroup>
+
+## Supported platforms
+
+MorJS compiles your source to any of the following targets by passing `--target` to the CLI:
+
+| Target | Platform | Notes |
+|--------|----------|-------|
+| `wechat` | WeChat | 微信小程序 |
+| `alipay` | Alipay | 支付宝小程序 |
+| `baidu` | Baidu | 百度智能小程序 |
+| `bytedance` | ByteDance | 字节跳动小程序 (Douyin) |
+| `qq` | QQ | QQ 小程序 |
+| `kuaishou` | Kuaishou | 快手小程序 |
+| `taobao` | Taobao | 淘宝小程序 |
+| `dingding` | DingTalk | 钉钉小程序 |
+| `web` | Web | H5 Web application |
+
+## Core packages
+
+MorJS is a monorepo. The packages you interact with most directly are:
+
+<CardGroup cols={2}>
+  <Card title="@morjs/cli" icon="terminal">
+    The command-line entry point. Registers `mor compile`, `mor create`, `mor compose`, and other commands. Exposes `defineConfig` for typed config files. Sets `mor.config.*` as the config file name.
+  </Card>
+  <Card title="@morjs/core" icon="microchip">
+    Runtime helpers for apps, pages, and components. Exports `createApp`, `createPage`, `createComponent`, and adapters (`wApp`/`aApp`, `wPage`/`aPage`, `wComponent`/`aComponent`) that normalize behavior across platforms.
+  </Card>
+  <Card title="@morjs/plugin-compiler" icon="gear">
+    The compilation engine. Orchestrates webpack, platform-specific loaders (script, template, style, config, sjs), entry discovery, and the transform/bundle pipeline.
+  </Card>
+  <Card title="@morjs/runtime-mini" icon="mobile">
+    Platform runtime shims for Alipay, Baidu, ByteDance, Kuaishou, QQ, and WeChat. Normalizes lifecycle and API differences at runtime so cross-platform code behaves consistently.
+  </Card>
+  <Card title="@morjs/runtime-web" icon="globe">
+    Bridges mini-program APIs to the browser environment so compiled output can run as an H5 application.
+  </Card>
+  <Card title="@morjs/takin" icon="layer-group">
+    The underlying CLI engine. Provides the `Takin` class, `Runner`, plugin system, config loading, and tapable lifecycle hooks used by all MorJS packages.
+  </Card>
+</CardGroup>
+
+<Note>
+  The `@morjs/utils` package re-exports `@morjs/takin` together with webpack utilities, zod schema helpers, and shared constants. `@morjs/cli` imports from `@morjs/utils` rather than `@morjs/takin` directly.
+</Note>
+
+## Project forms
+
+MorJS supports three mini-program project forms and allows converting between them:
+
+- **Mini-program** — a full standalone mini-program
+- **Subpackage** — a lazy-loaded subpackage inside a larger mini-program
+- **Plugin** — a mini-program plugin distributed as a reusable unit
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Getting started" icon="rocket" href="/introduction/getting-started">
+    Install the CLI, scaffold a project, and run your first compile.
+  </Card>
+  <Card title="Architecture" icon="sitemap" href="/introduction/architecture">
+    Understand Takin, Runner, and the plugin lifecycle.
+  </Card>
+  <Card title="Compile targets" icon="bullseye" href="/guides/compile-targets">
+    Configure which platforms to compile to and how.
+  </Card>
+  <Card title="Plugin development" icon="code" href="/advanced/plugin-development">
+    Write your own plugin to extend the MorJS lifecycle.
+  </Card>
+</CardGroup>

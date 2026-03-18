@@ -1,0 +1,244 @@
+---
+title: "Component API"
+description: "Runtime API for registering and enhancing mini-program components with MorJS lifecycle hooks, mixins, behaviors, and cross-platform adapters."
+---
+
+The Component API wraps the native `Component()` constructor to add MorJS lifecycle hooks, mixin / behavior merging, `pageLifetimes` bridging for Alipay, `$eventListener` binding, and cross-platform adapter support.
+
+## Functions
+
+### `createComponent`
+
+Registers a component with the MorJS runtime. Internally calls `enhanceComponent` and then the native `Component()` constructor.
+
+```ts
+function createComponent<
+  D extends IData,
+  P extends IData,
+  M extends IMethod
+>(
+  options: MorComponentOptions<D, P, M> & IData,
+  sourceType?: SOURCE_TYPE
+): any
+```
+
+<ParamField path="options" type="MorComponentOptions<D, P, M>" required>
+  Component configuration. Supports both Alipay and WeChat component shapes, plus MorJS extensions.
+</ParamField>
+
+<ParamField path="sourceType" type="SOURCE_TYPE">
+  DSL source type. Determines how lifetimes (`onInit`/`didMount` vs `created`/`attached`) are wired.
+</ParamField>
+
+```ts
+import { createComponent } from '@morjs/core'
+
+createComponent({
+  props: {
+    title: ''
+  },
+  data: {
+    count: 0
+  },
+  methods: {
+    increment() {
+      this.setData({ count: this.data.count + 1 })
+    }
+  }
+})
+```
+
+---
+
+### `aComponent`
+
+Registers an Alipay-style component. Equivalent to `createComponent(options, SOURCE_TYPE.ALIPAY)`.
+
+```ts
+function aComponent<D extends IData, P extends IData, M extends IMethod>(
+  options: MorComponentOptions<D, P, M> & IData
+): any
+```
+
+```ts
+import { aComponent } from '@morjs/core'
+
+aComponent({
+  props: { label: 'default' },
+  data: { visible: true },
+  methods: {
+    toggle() {
+      this.setData({ visible: !this.data.visible })
+    }
+  }
+})
+```
+
+---
+
+### `wComponent`
+
+Registers a WeChat-style component. Equivalent to `createComponent(options, SOURCE_TYPE.WECHAT)`.
+
+```ts
+function wComponent<D extends IData, P extends IData, M extends IMethod>(
+  options: MorComponentOptions<D, P, M> & IData
+): any
+```
+
+---
+
+### `enhanceComponent`
+
+Applies all MorJS enhancements to a component options object without registering it with the platform.
+
+```ts
+function enhanceComponent<D extends IData, P extends IData, M extends IMethod>(
+  options: MorComponentOptions<D, P, M> & IData,
+  sourceType?: SOURCE_TYPE,
+  features?: MorComponentEnhanceFeatures
+): Record<string, any>
+```
+
+<ParamField path="options" type="MorComponentOptions<D, P, M>" required>
+  The component options to enhance.
+</ParamField>
+
+<ParamField path="sourceType" type="SOURCE_TYPE">
+  Source DSL type.
+</ParamField>
+
+<ParamField path="features" type="MorComponentEnhanceFeatures">
+  Feature flags that control which enhancements are applied.
+</ParamField>
+
+<ResponseField name="return" type="Record<string, any>">
+  The enhanced component options object.
+</ResponseField>
+
+---
+
+### `registerComponentAdapters`
+
+Registers one or more component-level cross-platform adapters.
+
+```ts
+function registerComponentAdapters(
+  adapters?: MorComponentAdapter | MorComponentAdapter[]
+): void
+```
+
+<ParamField path="adapters" type="MorComponentAdapter | MorComponentAdapter[]">
+  Adapter(s) whose `initComponent` method will be called for every component registered with `createComponent`.
+</ParamField>
+
+```ts
+import { registerComponentAdapters } from '@morjs/core'
+
+registerComponentAdapters({
+  initComponent(componentOptions) {
+    // add a shared helper to every component
+    componentOptions.methods = componentOptions.methods ?? {}
+    componentOptions.methods.$log = function (msg) {
+      console.log('[component]', msg)
+    }
+  }
+})
+```
+
+---
+
+## Types
+
+### `MorComponentOptions`
+
+```ts
+type MorComponentOptions<
+  D extends IData,
+  P extends IData,
+  M extends IMethod
+> = Omit<CompoundComponentOptions<D, P, M>, 'methods' | 'data'> & {
+  data?: D
+  methods?: M & ThisType<MorComponentInstance<D, P> & M> & IMethod
+  lifetimes?: CompoundComponentOptions<D, P, M>['lifetimes'] &
+    ThisType<MorComponentInstance<D, P> & M>
+  mixins?: MorComponentOptions<D, P, M>[]
+  $eventListener?: Record<string, IAnyFunc>
+} & ThisType<MorComponentInstance<D, P> & M>
+```
+
+<ResponseField name="data" type="D">
+  Initial component data.
+</ResponseField>
+
+<ResponseField name="methods" type="M">
+  Component methods. `this` is typed as `MorComponentInstance<D, P> & M`.
+</ResponseField>
+
+<ResponseField name="lifetimes" type="object">
+  Component lifetime hooks object. WeChat-style (`created`, `attached`, `ready`, `moved`, `detached`, `error`); Alipay-style (`onInit`, `deriveDataFromProps`, `didMount`, `didUpdate`, `didUnmount`, `onError`).
+</ResponseField>
+
+<ResponseField name="mixins" type="MorComponentOptions<D, P, M>[]">
+  Array of mixin objects. Lifetime methods are merged; other methods use the last declaration.
+</ResponseField>
+
+<ResponseField name="$eventListener" type="Record<string, IAnyFunc>">
+  Map of global event names to handlers. Registered on mount and removed on unmount via the shared `$event` emitter.
+</ResponseField>
+
+---
+
+### `MorComponentAdapter`
+
+```ts
+interface MorComponentAdapter {
+  initComponent?: (componentOptions: Record<string, any>) => void
+}
+```
+
+<ResponseField name="initComponent" type="(componentOptions: Record<string, any>) => void">
+  Called once per component registration after all enhancements are applied, before `Component()` runs.
+</ResponseField>
+
+---
+
+### `MorComponentEnhanceFeatures`
+
+```ts
+interface MorComponentEnhanceFeatures {
+  invokeComponentHooks?: boolean
+}
+```
+
+<ResponseField name="invokeComponentHooks" type="boolean" default="true">
+  When `false`, the component's lifecycle methods do not fire the corresponding `MorHooks`. Used internally by `PageToComponent` where component-level hooks would be redundant.
+</ResponseField>
+
+---
+
+## Lifecycle mapping
+
+### Alipay DSL
+
+| Lifetime | MorHook |
+|---|---|
+| `onInit` | `componentOnInit` |
+| `didMount` | `componentDidMount` |
+| `didUnmount` | `componentDidUnmount` |
+| `onError` | `componentOnError` |
+
+### WeChat DSL
+
+| Lifetime | MorHook |
+|---|---|
+| `created` | `componentOnCreated` |
+| `attached` | `componentOnAttached` |
+| `detached` | `componentOnDetached` |
+| `error` | `componentOnError` |
+
+The `componentOnConstruct` hook (or `componentOnInit` as a fallback) fires at the start of `enhanceComponent`.
+
+### `pageLifetimes` bridging
+
+On Alipay targets, `pageLifetimes.show` / `hide` / `resize` are bridged via the shared `$event` emitter using page-scoped event names (`$mor:pageOnShow:<flag>`, etc.).

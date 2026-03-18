@@ -1,0 +1,178 @@
+---
+title: "Compile types"
+description: "MorJS supports four compile types — miniprogram, plugin, subpackage, and component — each with a different entry file and output structure."
+---
+
+The `compileType` configuration option tells MorJS what kind of artifact to produce. Each type uses a different root entry file and generates a different output structure.
+
+## Available types
+
+```typescript
+// From packages/utils/src/constants.ts
+export const CompileTypes = objectEnum([
+  'miniprogram',
+  'plugin',
+  'subpackage',
+  'component'
+])
+```
+
+The default is `miniprogram`.
+
+## miniprogram
+
+A complete standalone mini-program application. The root entry file is `app.json`.
+
+```
+src/
+├── app.json      ← root entry
+├── app.ts
+├── app.less
+└── pages/
+    └── index/
+        ├── index.ts
+        ├── index.wxml
+        ├── index.wxss
+        └── index.json
+```
+
+```typescript
+export default defineConfig([
+  {
+    target: 'wechat',
+    compileType: 'miniprogram',  // default — can be omitted
+  }
+])
+```
+
+`app.json` declares the page list, window defaults, and tab bar. MorJS reads it to discover all pages and components that need to be compiled.
+
+## plugin
+
+A mini-program plugin that extends a host mini-program. The root entry file is `plugin.json`.
+
+```
+src/
+├── plugin.json   ← root entry
+├── components/
+│   └── hello/
+│       └── ...
+└── pages/
+    └── ...
+```
+
+```typescript
+export default defineConfig([
+  {
+    target: 'wechat',
+    compileType: 'plugin',
+  }
+])
+```
+
+Because a plugin has no `App()` lifecycle, MorJS uses a mock app entry to provide the initialization context that runtime injection requires. By default it looks for `mor.plugin.app` and falls back to `app`.
+
+## subpackage
+
+A standalone subpackage intended to be integrated into a host mini-program. The root entry file is `subpackage.json`.
+
+```
+src/
+├── subpackage.json   ← root entry
+└── pages/
+    └── ...
+```
+
+```typescript
+export default defineConfig([
+  {
+    target: 'alipay',
+    compileType: 'subpackage',
+  }
+])
+```
+
+By default `processPlaceholderComponents` is `false` for subpackages. The mock app entry precedence is `mor.subpackage.app` then `app`.
+
+## component
+
+A single standalone component intended to be published as a library. There is no fixed entry file name — the entry is a single component directory.
+
+```
+src/
+└── my-button/
+    ├── index.ts
+    ├── index.wxml
+    ├── index.wxss
+    └── index.json
+```
+
+```typescript
+export default defineConfig([
+  {
+    target: 'alipay',
+    compileType: 'component',
+    compileMode: 'transform',  // commonly used with transform mode
+  }
+])
+```
+
+## Entry file reference
+
+| Compile type | Root entry file | Chinese description |
+|-------------|-----------------|---------------------|
+| `miniprogram` | `app.json` | 小程序 |
+| `plugin` | `plugin.json` | 插件 |
+| `subpackage` | `subpackage.json` | 分包 |
+| `component` | *(component dir)* | 组件 |
+
+## mockAppEntry
+
+For `plugin` and `subpackage` compile types there is no `App()` in source, but the runtime needs an app context to initialize. The `mockAppEntry` option points to an alternative app entry file:
+
+```typescript
+export default defineConfig([
+  {
+    target: 'wechat',
+    compileType: 'plugin',
+    mockAppEntry: 'mor.plugin.app',  // default for plugin type
+  }
+])
+```
+
+The resolution order is:
+
+<Steps>
+  <Step title="Check for mockAppEntry">
+    If `mockAppEntry` is explicitly set in config, that value is used.
+  </Step>
+  <Step title="Use type-specific default">
+    For `plugin` type, `mor.plugin.app` is tried first. For `subpackage` type, `mor.subpackage.app` is tried first.
+  </Step>
+  <Step title="Fall back to app">
+    If neither is found, `app` is used as the final fallback.
+  </Step>
+</Steps>
+
+## processPlaceholderComponents
+
+This option controls whether `componentPlaceholder` entries in `app.json` are compiled:
+
+| Compile type | Default value |
+|-------------|---------------|
+| `miniprogram` | `true` |
+| `plugin` | `true` |
+| `subpackage` | `false` |
+| `component` | `false` |
+
+You can override the default explicitly in config:
+
+```typescript
+export default defineConfig([
+  {
+    target: 'wechat',
+    compileType: 'subpackage',
+    processPlaceholderComponents: true,
+  }
+])
+```

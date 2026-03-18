@@ -1,0 +1,266 @@
+---
+title: Web options
+description: Configuration options specific to web compilation in MorJS, including rpx conversion, routing, dev server, and HTML output.
+---
+
+When `target` is set to `web`, MorJS uses `@morjs/plugin-compiler-web` to produce a standard HTML + JS + CSS web application from your mini-program source. All web-specific options live under the `web` key in your config.
+
+```typescript mor.config.ts
+import { defineConfig } from '@morjs/cli'
+
+export default defineConfig({
+  name: 'web',
+  sourceType: 'wechat',
+  target: 'web',
+  compileMode: 'bundle',
+
+  web: {
+    needRpx: true,
+    styleScope: true,
+    publicPath: '/'
+  }
+})
+```
+
+<Note>
+  All fields in this section are nested under the `web` key. They have no effect when compiling to mini-program targets.
+</Note>
+
+## How web compilation works
+
+MorJS transforms mini-program templates (WXML/AXML), scripts, and styles into web-compatible output:
+
+- **Templates** — Converted from WXML/AXML into web component markup using `@morjs/runtime-web`.
+- **Styles** — `rpx` units are converted to `rem` by default, enabling responsive scaling.
+- **Scripts** — Mini-program lifecycle APIs are shimmed via the web runtime's API layer.
+- **Routing** — Page routing is handled by the web runtime's router module.
+- **Assets** — Files up to 8 KB are inlined as base64 data URIs; larger files are emitted separately.
+
+## Output
+
+The default output directory for web builds is `dist/web`.
+
+In production bundle mode, output filenames include a content hash:
+```
+dist/web/pages/index.[contenthash:6].js
+dist/web/pages/index.[contenthash:6].css
+```
+
+In development mode, filenames have no hash:
+```
+dist/web/pages/index.js
+dist/web/pages/index.css
+```
+
+## Options reference
+
+### Layout and routing
+
+<ParamField path="web.showHeader" type="boolean | string[] | function" default="true">
+  Whether to show the navigation header bar on pages.
+
+  - `true` — Show on all pages.
+  - `false` — Hide on all pages.
+  - `string[]` — Show only on the listed page paths.
+  - `(pagePath: string) => boolean` — Custom function for per-page control.
+</ParamField>
+
+<ParamField path="web.showBack" type="boolean | string[] | function" default="false">
+  Whether to show a back button in the navigation header.
+
+  - `true` — Show on all pages.
+  - `false` — Hide on all pages.
+  - `string[]` — Show only on the listed page paths.
+  - `(pagePath: string) => boolean` — Custom function for per-page control.
+</ParamField>
+
+### RPX unit conversion
+
+<ParamField path="web.needRpx" type="boolean">
+  Enable `rpx` to `rem` conversion. When enabled, MorJS transforms `rpx` units in style files into `rem` values based on `rpxRootValue`. Pair this with the runtime `setRootFontSizeForRem` method for responsive scaling.
+</ParamField>
+
+<ParamField path="web.rpxRootValue" type="number" default="32">
+  The root `rem` value used for `rpx` conversion. `1rpx` equals `1/rpxRootValue rem`.
+</ParamField>
+
+<ParamField path="web.usePx" type="object">
+  Convert `rpx` to `px` instead of `rem`. Useful for fixed-layout scenarios.
+
+  ```typescript
+  usePx: {
+    ratio: 1  // 1rpx = 1/ratio px
+  }
+  ```
+
+  When `ratio` is `1`, `1rpx = 1px`. When `ratio` is `2`, `1rpx = 0.5px`.
+</ParamField>
+
+<ParamField path="web.responsiveRootFontSize" type="number">
+  Automatically set the root font size for responsive layouts. The base screen width is 375px.
+</ParamField>
+
+### Style isolation
+
+<ParamField path="web.styleScope" type="boolean">
+  Add a unique hash suffix to all CSS class names to prevent style collisions between pages. Recommended for multi-page applications.
+</ParamField>
+
+### Assets
+
+<ParamField path="web.inlineAssetLimit" type="number" default="8192">
+  Maximum file size in bytes for assets to be inlined as base64 data URIs. Files larger than this value are emitted as separate files. Default is `8192` (8 KB).
+</ParamField>
+
+<ParamField path="web.publicPath" type="string" default="/">
+  The base URL for all output asset references. Set this to match your deployment path, for example `/my-app/` for a subpath deployment.
+</ParamField>
+
+### Entries
+
+<ParamField path="web.autoGenerateEntries" type="boolean" default="true">
+  Automatically generate webpack entry files from your mini-program page and component structure. Disable this only if you need to manage webpack entries manually.
+</ParamField>
+
+<ParamField path="web.entry" type="any">
+  Custom webpack entry configuration. Only used when `autoGenerateEntries` is `false`. You are responsible for assembling page imports and runtime initialization.
+</ParamField>
+
+<ParamField path="web.emitIntermediateAssets" type="boolean" default="false">
+  Output intermediate compilation artifacts (pre-processed templates, scripts, and styles) alongside the final output. Useful for debugging the compilation pipeline.
+</ParamField>
+
+### Components
+
+<ParamField path="web.globalComponentsConfig" type="Record<string, string>">
+  Override the default component name mapping for web output. Keys are mini-program component names; values are their web equivalents.
+
+  ```typescript
+  globalComponentsConfig: {
+    'van-button': 'my-web-button'
+  }
+  ```
+</ParamField>
+
+### Extensions
+
+<ParamField path="web.extensions" type="Array<string | [string, object]>">
+  API and component extension modules to load in the web runtime. Extensions customize or augment the web runtime's behavior.
+
+  ```typescript
+  extensions: [
+    '@my-org/web-extension',
+    ['@my-org/another-extension', { option: true }]
+  ]
+  ```
+</ParamField>
+
+### HTML output
+
+<ParamField path="web.htmlOptions" type="object | object[]">
+  Configuration for `html-webpack-plugin`. Pass a single object for one HTML file, or an array of objects to generate multiple HTML entry pages.
+
+  ```typescript
+  htmlOptions: {
+    title: 'My App',
+    template: './public/index.html',
+    filename: 'index.html'
+  }
+  ```
+</ParamField>
+
+<ParamField path="web.miniCssExtractOptions" type="object">
+  Configuration for `mini-css-extract-plugin`. Controls how CSS is extracted into separate files.
+</ParamField>
+
+### Dev server
+
+<ParamField path="web.devServer" type="object">
+  Configuration for the webpack dev server. Accepts all [webpack DevServer](https://webpack.js.org/configuration/dev-server/) options.
+
+  ```typescript
+  devServer: {
+    port: 8080,
+    hot: true,
+    proxy: {
+      '/api': 'http://localhost:3000'
+    }
+  }
+  ```
+</ParamField>
+
+### App runtime config
+
+<ParamField path="web.appConfig" type="object" default="{}">
+  Runtime configuration injected into `window.$MOR_APP_CONFIG`. Consumed by the web runtime to customize behavior.
+
+  <Expandable title="fields">
+    <ResponseField name="enableCombineImportStyles" type="boolean" default="false">
+      Inline `@import` style contents into the importing stylesheet.
+    </ResponseField>
+    <ResponseField name="components" type="Record<string, any>">
+      Component-level config passed to specific web runtime components (for example, passing a Maps API key).
+    </ResponseField>
+    <ResponseField name="apis" type="Record<string, any>">
+      API-level config to customize the behavior of specific web runtime API shims.
+    </ResponseField>
+    <ResponseField name="customTabBarKey" type="string" default="tabBarKey">
+      The URL query parameter name used to select a tab bar configuration at runtime.
+    </ResponseField>
+    <ResponseField name="apiNoConflict" type="boolean">
+      Prevent the runtime from overwriting global object methods that already exist.
+    </ResponseField>
+    <ResponseField name="pageHeaderConfig" type="object">
+      Default header visibility settings applied at the app level.
+
+      ```typescript
+      pageHeaderConfig: {
+        showHeader: true,
+        showBack: false
+      }
+      ```
+    </ResponseField>
+    <ResponseField name="nav" type="object">
+      Navigation bar dimensions. Accepts numbers or CSS strings.
+
+      ```typescript
+      nav: {
+        statusBarHeight: 44,
+        titleBarHeight: 44
+      }
+      ```
+    </ResponseField>
+  </Expandable>
+</ParamField>
+
+## Minimal web config example
+
+```typescript mor.config.ts
+import { defineConfig } from '@morjs/cli'
+
+export default defineConfig({
+  name: 'web',
+  sourceType: 'wechat',
+  target: 'web',
+  compileMode: 'bundle',
+  mode: 'production',
+
+  web: {
+    needRpx: true,
+    styleScope: true,
+    publicPath: '/',
+    htmlOptions: {
+      title: 'My Mini-Program on Web',
+      template: './public/index.html'
+    },
+    devServer: {
+      port: 8080,
+      hot: true
+    }
+  }
+})
+```
+
+<Card title="Compiler options →" icon="gear" href="/api/config/compiler-options">
+  All compiler-level options that also apply to web builds, including aliases, defines, and TypeScript settings.
+</Card>

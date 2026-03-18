@@ -1,0 +1,324 @@
+---
+title: Configuration
+description: Full reference for mor.config.ts — the MorJS compiler configuration file.
+---
+
+## Config file format
+
+MorJS reads `mor.config.ts` (or `mor.config.js`) from the project root. Export a single config object or an array of configs for multi-target builds.
+
+```typescript mor.config.ts
+import { defineConfig } from '@morjs/cli'
+
+export default defineConfig({
+  name: 'alipay',
+  sourceType: 'alipay',
+  target: 'alipay'
+})
+```
+
+Use an array to compile to multiple targets in one run:
+
+```typescript mor.config.ts
+import { defineConfig } from '@morjs/cli'
+
+export default defineConfig([
+  {
+    name: 'alipay',
+    sourceType: 'alipay',
+    target: 'alipay'
+  },
+  {
+    name: 'web',
+    sourceType: 'alipay',
+    target: 'web'
+  }
+])
+```
+
+<Note>
+  `defineConfig` is a typed helper that provides full TypeScript autocompletion for all config fields.
+</Note>
+
+## Core fields
+
+### `name`
+
+A label for this config entry. Used to select a specific config with `--name <name>` from the CLI.
+
+### `sourceType`
+
+The DSL of your source code. MorJS uses this to determine which platform's template/style syntax to parse.
+
+| Value | Description |
+|-------|-------------|
+| `wechat` | WeChat mini-program DSL (default) |
+| `alipay` | Alipay mini-program DSL |
+
+If omitted, MorJS auto-detects based on whether `.wxml` or `.axml` files are found.
+
+### `target`
+
+The platform to compile to. See [Compile Targets](/guides/compile-targets) for all supported values.
+
+### `compileMode`
+
+How MorJS bundles and processes your code.
+
+| Value | Description |
+|-------|-------------|
+| `bundle` | Default. Resolves npm packages and produces a single optimised output with no `node_modules`. |
+| `transform` | Transpile-only mode. Converts source syntax without resolving npm dependencies. |
+
+### `compileType`
+
+The form of the output artefact.
+
+| Value | Entry file | Description |
+|-------|-----------|-------------|
+| `miniprogram` | `app.json` | Full mini-program (default). |
+| `plugin` | `plugin.json` | Mini-program plugin. |
+| `subpackage` | `subpackage.json` | Standalone subpackage. |
+| `component` | `component.json` | Reusable component library. |
+
+## Path options
+
+### `srcPath`
+
+Source code root directory. Defaults to `./src`.
+
+```typescript
+{
+  srcPath: './src'
+}
+```
+
+### `srcPaths`
+
+Multiple source roots. Useful when source is split across directories.
+
+```typescript
+{
+  srcPaths: ['./src', './shared']
+}
+```
+
+### `outputPath`
+
+Output directory. Each target has its own default (e.g., `dist/wechat`, `dist/alipay`). Override here or with `--output-path` on the CLI.
+
+```typescript
+{
+  outputPath: 'dist/my-alipay'
+}
+```
+
+## Build behaviour
+
+### `watch`
+
+Enable file watching (incremental rebuild). Equivalent to the `-w` / `--watch` CLI flag. Defaults to `false`.
+
+### `mode`
+
+Build mode, mirroring webpack's `mode` option.
+
+| Value | Description |
+|-------|-------------|
+| `development` | Default. Enables caching, readable output. |
+| `production` | Enables minification and optimisation. |
+
+### `minimize`
+
+Force-enable or disable minification. When `mode` is `production` this is automatically `true`.
+
+```typescript
+{
+  minimize: true
+}
+```
+
+### `autoClean`
+
+Delete the output directory before each build. Defaults to `false`.
+
+## Module resolution
+
+### `alias`
+
+Path aliases resolved at compile time. Equivalent to webpack's `resolve.alias`.
+
+```typescript
+{
+  alias: {
+    '@': './src',
+    '@utils': './src/utils'
+  }
+}
+```
+
+### `define`
+
+Replace global constants in source code at compile time. Only active in `bundle` mode.
+
+```typescript
+{
+  define: {
+    __DEV__: JSON.stringify(true),
+    API_BASE: JSON.stringify('https://example.com')
+  }
+}
+```
+
+### `copy`
+
+Copy files or directories from source to output without transformation.
+
+```typescript
+{
+  copy: [
+    'assets/fonts',
+    { from: 'static/icons', to: 'icons' }
+  ]
+}
+```
+
+Paths under `from` are relative to `srcPath`; paths under `to` are relative to `outputPath`.
+
+## Caching
+
+### `cache`
+
+Enable webpack's persistent filesystem cache to speed up rebuilds. Enabled by default in `development` mode, disabled in `production`.
+
+```typescript
+{
+  cache: true
+}
+```
+
+Disable with `--no-cache` on the CLI.
+
+## Runtime injection
+
+### `autoInjectRuntime`
+
+Controls automatic injection of the MorJS cross-platform runtime. Set to `true` (default) to inject all runtime shims, or configure granularly:
+
+```typescript
+{
+  autoInjectRuntime: {
+    app: true,       // Replace App({}) with MorJS runtime
+    page: true,      // Replace Page({}) with MorJS runtime
+    component: true, // Replace Component({}) with MorJS runtime
+    behavior: true,  // Replace Behavior({}) with MorJS runtime
+    api: 'enhanced'  // Global object replacement mode: 'enhanced' | 'lite' | 'minimal' | false
+  }
+}
+```
+
+`api` replacement modes:
+
+| Value | Description |
+|-------|-------------|
+| `enhanced` | Replaces `wx` → `mor` and injects an API compatibility layer. |
+| `lite` | Replaces `wx` → `my` globally. |
+| `minimal` | Replaces only function call sites, e.g. `wx.abc()` → `my.abc()`. |
+
+## TypeScript options
+
+### `compilerOptions`
+
+A subset of `tsconfig.json` compiler options applied during compilation.
+
+```typescript
+{
+  compilerOptions: {
+    // Module output format — each target sets its own default
+    module: 'CommonJS',          // 'CommonJS' | 'ESNext' | ...
+    target: 'ES5',               // 'ES5' | 'ES2015' | 'ES2019' | ...
+    importHelpers: true,         // Use tslib helpers (requires tslib dependency)
+    declaration: false,          // Emit .d.ts files (transform mode only)
+    esModuleInterop: true,
+    allowSyntheticDefaultImports: true
+  }
+}
+```
+
+## Conditional compilation
+
+### `conditionalCompile`
+
+Control what code is included at compile time based on context variables or file extensions.
+
+```typescript
+{
+  conditionalCompile: {
+    // Variables available in /* #if */ block comments
+    context: {
+      IS_WECHAT: true
+    },
+    // File-level conditional suffix, e.g. '.wx'
+    // MorJS will prefer index.wx.ts over index.ts when target is wechat
+    fileExt: '.wx'
+  }
+}
+```
+
+## Complete examples
+
+<CodeGroup>
+```typescript Single target (Alipay)
+import { defineConfig } from '@morjs/cli'
+
+export default defineConfig({
+  name: 'alipay',
+  sourceType: 'alipay',
+  target: 'alipay',
+  srcPath: './src',
+  alias: {
+    '@': './src'
+  }
+})
+```
+
+```typescript Multi-target (WeChat + Alipay + Web)
+import { defineConfig } from '@morjs/cli'
+
+export default defineConfig([
+  {
+    name: 'wechat',
+    sourceType: 'wechat',
+    target: 'wechat'
+  },
+  {
+    name: 'alipay',
+    sourceType: 'wechat',
+    target: 'alipay'
+  },
+  {
+    name: 'web',
+    sourceType: 'wechat',
+    target: 'web',
+    web: {
+      responsiveRootFontSize: 16,
+      showHeader: true
+    }
+  }
+])
+```
+
+```typescript Production build
+import { defineConfig } from '@morjs/cli'
+
+export default defineConfig({
+  name: 'alipay',
+  sourceType: 'alipay',
+  target: 'alipay',
+  mode: 'production',
+  minimize: true,
+  autoClean: true,
+  cache: false
+})
+```
+</CodeGroup>

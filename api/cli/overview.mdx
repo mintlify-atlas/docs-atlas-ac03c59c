@@ -1,0 +1,83 @@
+---
+title: CLI overview
+description: All available mor commands, global flags, and how to explore help information from the terminal.
+---
+
+The `mor` CLI is the primary interface for compiling, composing, generating, and mocking mini-programs with MorJS. Install it globally with:
+
+```bash
+npm install -g @morjs/cli
+```
+
+Verify the installation:
+
+```bash
+mor --version
+```
+
+## Available commands
+
+<Columns cols={2}>
+  <Card title="compile" icon="hammer" href="/api/cli/compile">
+    Compile a mini-program project to one or more target platforms. Supports bundle and transform modes, watch mode, and production builds.
+  </Card>
+  <Card title="compose" icon="puzzle-piece" href="/api/cli/compose">
+    Integrate multiple subpackages and host apps into a single mini-program output directory.
+  </Card>
+  <Card title="generate" icon="wand-magic-sparkles">
+    Scaffold new pages, components, and project structures using built-in or custom templates.
+  </Card>
+  <Card title="mock" icon="flask">
+    Start a local mock server to simulate API responses during development.
+  </Card>
+</Columns>
+
+## Global flags
+
+<ParamField path="--help" type="boolean">
+  Display help information for the current command. Run `mor --help` for the top-level help, or `mor <command> --help` for command-specific help.
+</ParamField>
+
+<ParamField path="--version" type="boolean">
+  Print the installed version of `@morjs/cli` and exit.
+</ParamField>
+
+<ParamField path="--verbose" type="boolean">
+  Enable detailed framework debug logging. Equivalent to setting the `DEBUG=mor,mor:*` environment variable.
+</ParamField>
+
+## Exploring help
+
+Run any command with `--help` to see all accepted flags and their descriptions:
+
+```bash
+# Top-level help
+mor --help
+
+# Command-specific help
+mor compile --help
+mor compose --help
+```
+
+## Configuration file
+
+All commands read configuration from `mor.config.ts` (or `.js`, `.mjs`, `.json`) in your project root. You can export a single config object or an array of configs when targeting multiple platforms simultaneously.
+
+```typescript mor.config.ts
+import { defineConfig } from '@morjs/cli'
+
+export default defineConfig({
+  name: 'wechat-build',
+  sourceType: 'wechat',
+  target: 'wechat',
+  compileMode: 'bundle'
+})
+```
+
+<Tip>
+  Use `defineConfig` from `@morjs/cli` for full TypeScript type checking on your configuration.
+</Tip>
+
+<Card title="Configuration reference →" icon="gear" href="/api/config/mor-config">
+  Full documentation for `mor.config.ts`, including all supported fields and export formats.
+</Card>

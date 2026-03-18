@@ -1,0 +1,244 @@
+---
+title: 'Custom compiler plugins'
+description: 'Extend the MorJS compiler with custom webpack configuration, parser plugins, and loader options.'
+---
+
+MorJS's compiler (`@morjs/plugin-compiler`) is itself a MorJS plugin that runs inside the `compile` command's `Runner`. It registers additional hooks — such as `webpackWrapper`, `scriptParser`, `templateParser`, and `styleParser` — that let you plug into specific stages of the compilation pipeline.
+
+## Compiler plugin interface (CompilerPlugin)
+
+A `CompilerPlugin` defines target-specific behavior for one mini-program platform. The interface is declared in `packages/plugin-compiler/src/compilerPlugins.ts`:
+
+```typescript
+export interface CompilerPlugin {
+  target: string                        // e.g. 'alipay', 'wechat'
+  targetDescription: string
+  fileType: {
+    template: string                    // e.g. '.axml', '.wxml'
+    style: string                       // e.g. '.acss', '.wxss'
+    script: string                      // e.g. '.js'
+    config: string                      // e.g. '.json'
+    sjs: string                         // e.g. '.sjs', '.wxs'
+  }
+  compileModuleKind: CompileModuleKindType
+  compileScriptTarget: CompileScriptTargetType
+  globalObject: string                  // e.g. 'my', 'wx'
+  resolveMainFields: string[]
+  defaultConditionalFileExt: string
+  defaultOutputDir: string
+  projectConfigFiles: string[]
+  supportGlobalComponents: boolean
+  templateSingleTagNames: string[]
+  templateDirectives: CompilerTemplateDirectives
+  templateProcessor: CompilerTemplateProcessor
+  getRuntimeFiles?: (sourceType: string, target: string) => CompilerRuntimeConfig
+  Plugin?: PluginForCompiler
+  // ...additional fields
+}
+```
+
+## getComposedCompilerPlugins()
+
+Call `getComposedCompilerPlugins()` to retrieve a map of all registered compiler plugins, keyed first by property name and then by target:
+
+```typescript
+import { getComposedCompilerPlugins } from '@morjs/plugin-compiler'
+
+const composed = getComposedCompilerPlugins()
+
+// Access the global object for the 'alipay' target:
+const globalObject = composed.globalObject['alipay']  // 'my'
+
+// Access the file types for the 'wechat' target:
+const wechatFileType = composed.fileType['wechat']  // { template: '.wxml', style: '.wxss', ... }
+```
+
+To replace or add targets, call `setCompilerPlugins()` with a new list:
+
+```typescript
+import {
+  getAllCompilerPlugins,
+  setCompilerPlugins
+} from '@morjs/plugin-compiler'
+import type { CompilerPlugin } from '@morjs/plugin-compiler'
+
+const myTarget: CompilerPlugin = {
+  target: 'my-target',
+  targetDescription: 'My custom target',
+  fileType: {
+    template: '.html',
+    style: '.css',
+    script: '.js',
+    config: '.json',
+    sjs: '.js'
+  },
+  // ...other required fields
+}
+
+setCompilerPlugins([...getAllCompilerPlugins(), myTarget])
+```
+
+## CustomLoaderOptions
+
+When writing a custom webpack loader for MorJS files, use `CustomLoaderOptions` (defined in `packages/plugin-compiler/src/constants.ts`) to access compiler state:
+
+```typescript
+export interface CustomLoaderOptions {
+  userConfig: CompilerUserConfig
+  entryBuilder: EntryBuilderHelpers
+  runner: Runner
+  // Fallback for node_modules processing when userConfig.processNodeModules is not set
+  processNodeModules?: boolean
+}
+```
+
+A loader receives this object as its `options` parameter:
+
+```typescript
+// loaders/my-loader.ts
+import type { CustomLoaderOptions } from '@morjs/plugin-compiler'
+
+export default function myLoader(this: any, source: string): string {
+  const options: CustomLoaderOptions = this.getOptions()
+  const { userConfig, runner } = options
+
+  runner.logger.debug(`Processing file for target: ${userConfig.target}`)
+  // transform source...
+  return source
+}
+```
+
+## Adding custom webpack configuration
+
+Use the `webpackWrapper` hook to modify the webpack chain config. This hook is fired by `@morjs/plugin-compiler` after the base webpack config is built:
+
+```typescript
+import type { Plugin, Runner } from '@morjs/utils'
+
+export class MyWebpackPlugin implements Plugin {
+  name = 'MyWebpackPlugin'
+
+  apply(runner: Runner) {
+    runner.hooks.webpackWrapper.tap(this.name, (wrapper) => {
+      const chain = wrapper.chain
+
+      // Add a resolve alias
+      chain.resolve.alias.set('@utils', '/src/utils')
+
+      // Add a custom rule
+      chain
+        .module
+        .rule('my-rule')
+        .test(/\.custom$/)
+        .use('my-loader')
+        .loader(require.resolve('./loaders/my-loader'))
+        .options({ myOption: true })
+
+      // Add a webpack plugin
+      chain
+        .plugin('my-webpack-plugin')
+        .use(require('some-webpack-plugin'), [{ option: true }])
+    })
+  }
+}
+```
+
+<Note>
+  The `webpackWrapper` hook is only available in compiler plugins (i.e., plugins running inside a `compile` command runner). It is not present in the base `Runner`.
+</Note>
+
+## Parser plugins
+
+The compiler exposes per-file-type parser hooks. Each hook receives the current parser chain and file options, and must return the (possibly modified) chain.
+
+### scriptParser
+
+Tap into `scriptParser` to add TypeScript custom transformers:
+
+```typescript
+runner.hooks.scriptParser.tap(this.name, (transformers, options) => {
+  const { fileInfo } = options
+  runner.logger.debug(`Parsing script: ${fileInfo.path}`)
+
+  transformers.before.push(
+    myTypescriptTransformer()
+  )
+
+  return transformers
+})
+```
+
+### templateParser
+
+Tap into `templateParser` to walk and modify the PostHTML AST for template files (`.axml`, `.wxml`, etc.):
+
+```typescript
+runner.hooks.templateParser.tap(this.name, (tree, options) => {
+  const { fileInfo } = options
+
+  tree.walk((node) => {
+    if (node.tag === 'view' && node.attrs?.class) {
+      // Modify class attributes
+      node.attrs.class = node.attrs.class + ' injected'
+    }
+    return node
+  })
+
+  return tree
+})
+```
+
+### styleParser
+
+Tap into `styleParser` to add PostCSS plugins:
+
+```typescript
+import { cssProcessorFactory } from '@morjs/utils'
+
+runner.hooks.styleParser.tap(this.name, (plugins, options) => {
+  return plugins.concat(
+    cssProcessorFactory(this.name, (root) => {
+      root.walkDecls(/color/, (decl) => {
+        runner.logger.debug(`Found color declaration in ${options.fileInfo.path}`)
+      })
+    })
+  )
+})
+```
+
+### configParserPlugin
+
+Tap into `configParser` to transform JSON config files:
+
+```typescript
+runner.hooks.configParser.tap(this.name, (config, options) => {
+  // config is the parsed JSON object for the current .json file
+  if (options.fileInfo.path.endsWith('app.json')) {
+    config.customField = 'injected'
+  }
+  return config
+})
+```
+
+## Template processor
+
+For platform-specific template processing, implement `CompilerTemplateProcessor`:
+
+```typescript
+import type { CompilerTemplateProcessor } from '@morjs/plugin-compiler'
+
+const processor: CompilerTemplateProcessor = {
+  onNode(node, options, context) {
+    // Called when entering a template node
+  },
+  onNodeExit(node, options, context) {
+    // Called when leaving a template node
+  },
+  onNodeAttr(attrName, node, options, context) {
+    // Called when entering a node attribute
+  },
+  onNodeAttrExit(attrName, node, options, context) {
+    // Called when leaving a node attribute
+  }
+}
+```

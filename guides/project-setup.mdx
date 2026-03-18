@@ -1,0 +1,133 @@
+---
+title: Project Setup
+description: Scaffold a new MorJS project and understand the recommended directory structure.
+---
+
+## Creating a new project
+
+<Steps>
+  <Step title="Run the create command">
+    ```bash
+    mor create my-app
+    ```
+
+    The interactive generator will prompt you to choose a template (Alipay, WeChat, etc.) and configure basic project settings.
+  </Step>
+
+  <Step title="Install dependencies">
+    ```bash
+    cd my-app
+    npm install
+    ```
+  </Step>
+
+  <Step title="Start development">
+    ```bash
+    npm run dev
+    ```
+
+    This runs `mor compile -w`, which watches your source files and recompiles on change.
+  </Step>
+</Steps>
+
+## Project structure
+
+A typical MorJS project looks like this:
+
+```
+my-app/
+├── src/
+│   ├── app.json          # Mini-program entry config (pages, window, tabBar)
+│   ├── app.ts            # App lifecycle (onLaunch, onShow, etc.)
+│   ├── app.less          # Global styles
+│   └── pages/
+│       └── index/
+│           ├── index.ts
+│           ├── index.axml   # or index.wxml for WeChat source
+│           ├── index.acss   # or index.wxss
+│           └── index.json
+├── mor.config.ts         # MorJS compiler configuration
+└── package.json
+```
+
+### `src/app.json`
+
+The entry configuration file lists all pages and configures the global window style and tabBar. MorJS reads this file to discover the pages to compile.
+
+```json src/app.json
+{
+  "pages": [
+    "pages/index/index",
+    "pages/detail/index"
+  ],
+  "window": {
+    "defaultTitle": "My App",
+    "backgroundColor": "#F5F5F9"
+  }
+}
+```
+
+### `src/app.ts`
+
+The App entry script. MorJS automatically wraps the `App({})` call with its runtime when compiling cross-platform.
+
+```typescript src/app.ts
+App({
+  onLaunch() {
+    console.log('App launched')
+  }
+})
+```
+
+### `src/pages/`
+
+Each page is a directory containing four files with matching names: script, template, style, and config. The file extensions depend on your `sourceType`:
+
+| Source type | Template | Style  | Script |
+|-------------|----------|--------|--------|
+| `alipay`    | `.axml`  | `.acss`| `.ts`  |
+| `wechat`    | `.wxml`  | `.wxss`| `.ts`  |
+
+### `mor.config.ts`
+
+The compiler configuration file. See the [Configuration guide](/guides/configuration) for all available options.
+
+## `package.json` scripts
+
+Add these scripts to your `package.json`:
+
+```json package.json
+{
+  "scripts": {
+    "dev": "mor compile -w",
+    "build": "mor compile",
+    "dev:wechat": "mor compile --name wechat -w",
+    "dev:web": "mor compile --name web -w"
+  },
+  "engines": {
+    "node": ">= 12.13.0"
+  },
+  "dependencies": {
+    "@morjs/core": "*"
+  },
+  "devDependencies": {
+    "@morjs/cli": "*"
+  }
+}
+```
+
+<Tip>
+  Use `--name <configName>` to run only one configuration from a multi-config `mor.config.ts` array. For example, `mor compile --name web -w` starts the dev server for the web target only.
+</Tip>
+
+## Node.js engine requirement
+
+Specify the minimum Node.js version in `package.json` to prevent accidental use of an incompatible environment:
+
+```json
+{
+  "engines": {
+    "node": ">= 12.13.0"
+  }
+}
+```

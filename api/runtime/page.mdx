@@ -1,0 +1,211 @@
+---
+title: "Page API"
+description: "Runtime API for registering and enhancing mini-program pages with MorJS lifecycle hooks, mixins, and cross-platform adapters."
+---
+
+The Page API wraps the native `Page()` constructor to add MorJS lifecycle hooks, mixin composition, `appLifetimes` support, `$eventListener` binding, and cross-platform adapter invocation.
+
+## Functions
+
+### `createPage`
+
+Registers a page with the MorJS runtime. Internally calls `enhancePage` and then the native `Page()` constructor.
+
+```ts
+function createPage<D extends IData, T extends IData>(
+  options: MorPageOptions<D, T>,
+  sourceType?: SOURCE_TYPE
+): any
+```
+
+<ParamField path="options" type="MorPageOptions<D, T>" required>
+  The page configuration object. Supports both Alipay and WeChat page option shapes, plus MorJS extensions (`mixins`, `$eventListener`, `appLifetimes`).
+</ParamField>
+
+<ParamField path="sourceType" type="SOURCE_TYPE">
+  Specifies the DSL source type (`SOURCE_TYPE.ALIPAY` or `SOURCE_TYPE.WECHAT`). When omitted MorJS logs a warning because lifecycle handling differs between platforms.
+</ParamField>
+
+```ts
+import { createPage } from '@morjs/core'
+
+createPage({
+  data: {
+    title: 'Hello'
+  },
+  onLoad(query) {
+    console.log('page loaded', query)
+  },
+  onReady() {
+    console.log('page ready')
+  },
+  onUnload() {
+    console.log('page unloaded')
+  }
+})
+```
+
+---
+
+### `aPage`
+
+Registers an Alipay-style page. Equivalent to `createPage(options, SOURCE_TYPE.ALIPAY)`.
+
+```ts
+function aPage<D extends IData, T extends IData>(
+  options: MorPageOptions<D, T>
+): any
+```
+
+```ts
+import { aPage } from '@morjs/core'
+
+aPage({
+  data: { count: 0 },
+  onLoad() {
+    this.setData({ count: 1 })
+  }
+})
+```
+
+---
+
+### `wPage`
+
+Registers a WeChat-style page. Equivalent to `createPage(options, SOURCE_TYPE.WECHAT)`.
+
+```ts
+function wPage<D extends IData, T extends IData>(
+  options: MorPageOptions<D, T>
+): any
+```
+
+```ts
+import { wPage } from '@morjs/core'
+
+wPage({
+  data: { count: 0 },
+  onLoad() {
+    this.setData({ count: 1 })
+  }
+})
+```
+
+---
+
+### `enhancePage`
+
+Applies all MorJS enhancements to a page options object without registering it. Useful when you need the enhanced options for further processing (for example, `PageToComponent`).
+
+```ts
+function enhancePage<D extends IData, T extends IData>(
+  options: MorPageOptions<D, T>,
+  sourceType?: SOURCE_TYPE
+): IData
+```
+
+<ParamField path="options" type="MorPageOptions<D, T>" required>
+  The page options to enhance.
+</ParamField>
+
+<ParamField path="sourceType" type="SOURCE_TYPE">
+  Source DSL type. Affects how `onResize` is handled (Alipay puts it inside `events`, WeChat uses a top-level method).
+</ParamField>
+
+<ResponseField name="return" type="IData">
+  The mutated page options object with all lifecycle hooks wired and mixins merged.
+</ResponseField>
+
+---
+
+### `registerPageAdapters`
+
+Registers one or more page-level cross-platform adapters.
+
+```ts
+function registerPageAdapters(
+  adapters?: MorPageAdapter | MorPageAdapter[]
+): void
+```
+
+<ParamField path="adapters" type="MorPageAdapter | MorPageAdapter[]">
+  Adapter(s) whose `initPage` method will be called for every page created by `createPage`.
+</ParamField>
+
+```ts
+import { registerPageAdapters } from '@morjs/core'
+
+registerPageAdapters({
+  initPage(pageOptions) {
+    // add a custom method to every page
+    pageOptions.myHelper = function () {}
+  }
+})
+```
+
+---
+
+## Types
+
+### `MorPageOptions`
+
+The complete page options type accepted by `createPage`, `aPage`, and `wPage`.
+
+```ts
+type MorPageOptions<D extends IData, T extends IData> = {
+  mixins?: CompoundPageOptions<D, T>[]
+  $eventListener?: Record<string, IAnyFunc>
+} & CompoundPageOptions<D, T> &
+  ThisType<WechatMiniprogram.Page.Instance<D, T> & tinyapp.IPageInstance<D>>
+```
+
+<ResponseField name="mixins" type="CompoundPageOptions<D, T>[]">
+  Array of mixin objects. Lifecycle methods are merged and called in order; non-lifecycle methods use the last-declared version; data and object fields are shallow-merged.
+</ResponseField>
+
+<ResponseField name="$eventListener" type="Record<string, IAnyFunc>">
+  Map of global event names to handler functions. MorJS registers these on the shared `$event` emitter when the page loads and removes them on unload.
+</ResponseField>
+
+<ResponseField name="appLifetimes" type="{ show?: Function; hide?: Function }">
+  Handlers that fire when the host app shows or hides, while this page is active. Registered in `onLoad` and unregistered in `onUnload`.
+</ResponseField>
+
+---
+
+### `MorPageAdapter`
+
+```ts
+interface MorPageAdapter {
+  initPage?: (pageOptions: Record<string, any>) => void
+}
+```
+
+<ResponseField name="initPage" type="(pageOptions: Record<string, any>) => void">
+  Called once per page registration, after all enhancements are applied but before the native `Page()` constructor runs.
+</ResponseField>
+
+---
+
+## Lifecycle hooks
+
+The following page lifecycle methods are intercepted by MorJS:
+
+| Method | MorHook | Notes |
+|---|---|---|
+| `onLoad` | `pageOnLoad` | Also registers `$eventListener` and `appLifetimes` |
+| `onReady` | `pageOnReady` | Emits `$mor:pageOnReady:<flag>` |
+| `onShow` | `pageOnShow` | Emits `$mor:pageOnShow:<flag>` |
+| `onHide` | `pageOnHide` | Emits `$mor:pageOnHide:<flag>` |
+| `onUnload` | `pageOnUnload` | Removes event listeners and `appLifetimes` |
+| `onResize` | — | Emits `$mor:pageOnResize:<flag>`; Alipay uses `events.onResize` |
+
+The `pageOnConstruct` hook (falling back to `pageOnInit`) fires at the start of `enhancePage`.
+
+### Alipay-specific lifecycle methods (via mixins)
+
+`onTitleClick`, `onOptionMenuClick`, `onPopMenuClick`, `onPullIntercept`, `onTabItemTap`
+
+### WeChat-specific lifecycle methods (via mixins)
+
+`onShareTimeline`, `onResize`, `onAddToFavorites`

@@ -1,0 +1,200 @@
+---
+title: Contributing
+description: How to contribute code, tests, and documentation to MorJS.
+---
+
+MorJS is an open-source project maintained by Ele.me. Contributions of all
+kinds are welcome — bug reports, feature requests, documentation improvements,
+and pull requests.
+
+<Note>
+  Full contributing guidelines are kept at
+  [mor.ele.me/guides/contributing](https://mor.ele.me/guides/contributing). This
+  page is a quick-start reference.
+</Note>
+
+## Repository Structure
+
+MorJS is a **Lerna monorepo**. All packages live under `packages/` and are
+published independently to npm under the `@morjs` scope.
+
+```
+morjs/
+├── packages/
+│   ├── cli/                    # MorJS CLI
+│   ├── core/                   # Core runtime and plugin system
+│   ├── api/                    # Cross-platform API surface
+│   ├── runtime-mini/           # Mini-program runtime shims
+│   ├── runtime-web/            # Web runtime
+│   ├── plugin-compiler/        # Base compiler plugin
+│   ├── plugin-compiler-alipay/ # Alipay target compiler
+│   ├── plugin-compiler-wechat/ # WeChat target compiler
+│   └── utils/                  # Shared utilities
+├── scripts/
+│   └── build.js               # Build script
+├── CHANGELOG.md
+└── lerna.json
+```
+
+## Setting Up the Dev Environment
+
+<Steps>
+  <Step title="Fork and clone the repository">
+    ```bash
+    git clone https://github.com/eleme/morjs.git
+    cd morjs
+    ```
+  </Step>
+
+  <Step title="Install dependencies">
+    MorJS uses npm workspaces managed by Lerna. Run the standard install at
+    the repo root:
+
+    ```bash
+    npm install
+    ```
+
+    This installs all workspace dependencies and links local packages to each
+    other.
+  </Step>
+
+  <Step title="Build all packages">
+    ```bash
+    node ./scripts/build.js
+    ```
+
+    The build script compiles TypeScript sources for every package in
+    dependency order and outputs to each package's `lib/` and `esm/`
+    directories.
+  </Step>
+
+  <Step title="Watch mode (optional)">
+    To rebuild a specific package on file changes while developing, run the
+    package's own `dev` script:
+
+    ```bash
+    cd packages/plugin-compiler-alipay
+    npm run dev
+    ```
+  </Step>
+</Steps>
+
+## Running Tests
+
+Tests are colocated with each package and run via Lerna:
+
+```bash
+# Run all tests across all packages
+lerna run test
+
+# Run tests for a single package
+cd packages/runtime-mini
+npm test
+```
+
+<Warning>
+  Always run the full test suite before submitting a pull request. CI will
+  reject PRs with failing tests.
+</Warning>
+
+## Commit Convention
+
+MorJS enforces [Conventional Commits](https://conventionalcommits.org) via
+**commitlint**. Every commit message must follow the pattern:
+
+```
+<type>(<scope>): <subject>
+```
+
+**Allowed types:**
+
+| Type | When to use |
+|------|-------------|
+| `feat` | A new feature |
+| `fix` | A bug fix |
+| `docs` | Documentation only |
+| `style` | Formatting, whitespace (no logic change) |
+| `refactor` | Code restructuring without behaviour change |
+| `perf` | Performance improvement |
+| `test` | Adding or fixing tests |
+| `chore` | Tooling, CI, build scripts |
+| `revert` | Reverting a previous commit |
+
+**Scope** is the package name without the `@morjs/` prefix, e.g.:
+
+```
+feat(plugin-compiler-alipay): support custom tabBar directory for different targets
+fix(runtime-mini): remove saveImageToPhotosAlbum => saveImage transform for alipay-to-wechat
+docs(cli): update config reference for autoInjectRuntime
+```
+
+<Tip>
+  Use `git commit` interactively or install
+  [commitizen](https://github.com/commitizen/cz-cli) (`npm i -g commitizen`)
+  to generate compliant messages with a prompt.
+</Tip>
+
+## Pull Request Process
+
+<Steps>
+  <Step title="Create a feature branch">
+    Branch off `main` with a descriptive name:
+
+    ```bash
+    git checkout -b feat/plugin-compiler-wechat-my-feature
+    ```
+  </Step>
+
+  <Step title="Make your changes">
+    - Keep changes focused. One logical change per PR makes reviews faster.
+    - Add or update tests to cover the new behaviour.
+    - Update relevant documentation if the public API changes.
+  </Step>
+
+  <Step title="Verify everything passes">
+    ```bash
+    node ./scripts/build.js
+    lerna run test
+    ```
+  </Step>
+
+  <Step title="Open a pull request">
+    Push your branch and open a PR against `main` on GitHub. Fill in the PR
+    template:
+
+    - **What** — summarise what changed.
+    - **Why** — explain the motivation.
+    - **How to test** — describe the manual or automated steps to verify.
+
+    Link any related issues with `Fixes #<issue>` in the description.
+  </Step>
+
+  <Step title="Address review feedback">
+    Maintainers will review your PR. Push additional commits to the same branch
+    to address feedback. Avoid force-pushing after a review has started.
+  </Step>
+</Steps>
+
+## Code Style
+
+- **TypeScript** is required for all new code under `packages/`.
+- Existing ESLint and Prettier configuration is enforced via pre-commit hooks.
+- Run `npm run lint` in a package to check locally before committing.
+
+## Reporting Issues
+
+<CardGroup cols={2}>
+  <Card title="Bug reports" icon="bug" href="https://github.com/eleme/morjs/issues/new?template=bug_report.md">
+    Open a GitHub issue with a minimal reproduction. Include your MorJS
+    version, target platform, and the error output.
+  </Card>
+  <Card title="Feature requests" icon="lightbulb" href="https://github.com/eleme/morjs/issues/new?template=feature_request.md">
+    Describe the use case and the desired behaviour. PRs that come with a
+    linked issue are merged faster.
+  </Card>
+</CardGroup>
+
+## Code of Conduct
+
+This project follows the [Contributor Covenant](https://www.contributor-covenant.org/version/2/1/code_of_conduct/).
+Please be respectful and constructive in all interactions.

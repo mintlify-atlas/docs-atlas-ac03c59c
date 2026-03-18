@@ -1,0 +1,136 @@
+---
+title: 'Phantom dependency detection'
+description: 'Detect and prevent the use of undeclared npm packages in your mini-program source code.'
+---
+
+A phantom dependency is an npm package that your code imports but that is not listed in your project's `package.json`. It happens because Node.js resolves modules by walking up the directory tree — a package installed by a dependency of yours is accessible to your code, even though you never declared it.
+
+In mini-program development this is particularly risky: the package might disappear or change version when the dependency that brought it in is upgraded, causing hard-to-debug runtime failures.
+
+MorJS's `phantomDependency` option analyzes imports and `require()` calls in all source files (excluding `node_modules`) and compares them against your `package.json` dependencies.
+
+## Enabling the check
+
+Set `phantomDependency` to an object in your compile configuration:
+
+```typescript
+// mor.config.ts
+export default defineConfig([
+  {
+    target: 'alipay',
+    phantomDependency: {
+      // 'warn' (default) — print a warning table and continue.
+      // 'error' — print an error table and exit with code 1 (non-watch mode).
+      mode: 'warn',
+
+      // Packages to whitelist even though they are not in package.json.
+      // Useful for peer dependencies or environment-provided globals.
+      exclude: []
+    }
+  }
+])
+```
+
+Set it to `false` (the default) to disable the check entirely:
+
+```typescript
+phantomDependency: false
+```
+
+## Configuration options
+
+<AccordionGroup>
+  <Accordion title="mode">
+    Controls what happens when phantom dependencies are detected.
+
+    | Value | Behavior |
+    |---|---|
+    | `'warn'` | Prints a warning table listing each phantom dependency and the source file that imports it. Compilation continues. |
+    | `'error'` | Prints an error table and throws, causing the process to exit with code `1`. In watch mode, the error is logged but the process does not exit. |
+
+    ```typescript
+    phantomDependency: {
+      mode: 'error'
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="exclude">
+    An array of npm package names to skip, even when they are not listed in `package.json`.
+
+    Common use cases:
+    - Packages provided by the mini-program runtime environment.
+    - Peer dependencies expected to be installed by consumers.
+    - Packages listed in a workspace root `package.json` rather than the local one.
+
+    ```typescript
+    phantomDependency: {
+      mode: 'warn',
+      exclude: ['@ali/some-env-package', 'react']
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## What is checked
+
+The `PhantomDependencyPlugin` (in `packages/plugin-compiler/src/plugins/phantomDependencyPlugin.ts`) instruments the TypeScript compiler transformer pipeline to collect every `import` and `require()` call found in:
+
+- Script files (`.js`, `.ts`, `.mjs`, `.mts`)
+- SJS files (`.sjs`, `.wxs`)
+
+Local paths (those starting with `.`, `/`, `@/`, or `@@/`) are ignored. Only bare package specifiers are checked.
+
+At the end of compilation (`done` hook), the collected specifiers are compared against:
+
+1. `dependencies` and `devDependencies` in `package.json` at the project root.
+2. `dependencies` and `devDependencies` in `package.json` files found inside each `srcPaths` entry.
+3. Keys in `alias` and `resolve.alias` (aliased paths are not real packages).
+4. Packages listed in `externals` or `consumes`.
+5. The `exclude` array from `phantomDependency` config.
+
+Anything that passes all five checks is reported as a phantom dependency.
+
+## Example output
+
+When phantom dependencies are detected in `warn` mode, MorJS logs:
+
+```
+[mor] Detected phantom dependencies, please add to package.json
+┌──────────────────┬──────────────────────────────────┐
+│ Dependency       │ Referenced in                    │
+├──────────────────┼──────────────────────────────────┤
+│ lodash           │ /src/utils/format.ts             │
+│ dayjs            │ /src/pages/index/index.ts        │
+└──────────────────┴──────────────────────────────────┘
+```
+
+In `error` mode the same table is printed at error level and the build exits with code `1`.
+
+## Resolving phantom dependencies
+
+<Steps>
+  <Step title="Identify the packages">
+    Run `mor compile` (or `mor compile --watch`) and look for the phantom dependency table in the output.
+  </Step>
+
+  <Step title="Add them to package.json">
+    For each reported package, add it as a proper dependency:
+
+    ```bash
+    npm install lodash
+    npm install dayjs
+    ```
+  </Step>
+
+  <Step title="Or whitelist intentional exceptions">
+    If a package is legitimately available without being declared (for example, a runtime-injected package), add it to `exclude`:
+
+    ```typescript
+    phantomDependency: {
+      mode: 'warn',
+      exclude: ['@platform/injected-lib']
+    }
+    ```
+  </Step>
+</Steps>

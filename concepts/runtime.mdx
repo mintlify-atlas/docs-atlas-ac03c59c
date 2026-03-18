@@ -1,0 +1,196 @@
+---
+title: "Runtime"
+description: "The MorJS runtime normalizes API behavior and component lifecycle differences across platforms at run time, complementing the compile-time transformations."
+---
+
+MorJS's compile-time transformations handle static differences like template directive syntax. The runtime layer handles dynamic differences: API response shapes, lifecycle argument variations, and platform-specific behaviors that can only be resolved while the mini-program is running.
+
+## Runtime packages
+
+<CardGroup cols={3}>
+  <Card title="@morjs/runtime-mini" icon="mobile">
+    Platform adapters for each supported mini-program target. Contains API transform configs and component/page adapters for every source-to-target combination.
+  </Card>
+  <Card title="@morjs/runtime-base" icon="cubes">
+    Shared utilities used by all runtimes: environment detection, event system, hooks, logger, base64, and API transform infrastructure.
+  </Card>
+  <Card title="@morjs/runtime-web" icon="globe">
+    Web-specific runtime that maps mini-program APIs and components to browser equivalents when targeting the `web` platform.
+  </Card>
+</CardGroup>
+
+## What the runtime provides
+
+At a high level, `@morjs/runtime-mini` normalizes four categories of cross-platform difference:
+
+- **API normalization** — rewrites method names, parameter keys, and response shapes so Alipay APIs work on WeChat and vice versa.
+- **Page adapters** — adapts page lifecycle methods and data between source and target.
+- **Component adapters** — adapts component lifecycle, properties, and events.
+- **Behavior/Mixin adapters** — bridges WeChat `Behavior` and Alipay `Mixin` idioms.
+
+The adapter selection is driven by the `sourceType` and `target` values used at compile time. The runtime skips all transformation when source and target are the same platform.
+
+## Auto runtime injection
+
+MorJS automatically injects runtime wrappers at compile time. The `autoInjectRuntime` configuration controls which constructors are wrapped:
+
+```typescript
+// From packages/plugin-compiler/src/constants.ts
+autoInjectRuntime: z
+  .object({
+    app:       z.boolean().optional(),
+    page:      z.boolean().optional(),
+    component: z.boolean().optional(),
+    behavior:  z.boolean().optional(),
+    mixin:     z.boolean().optional(),
+    api:       z.boolean().optional().or(z.nativeEnum(GlobalObjectTransformTypes))
+  })
+  .or(z.boolean())
+  .default(true)
+```
+
+When `autoInjectRuntime` is `true` (the default for cross-platform compilation), MorJS replaces each constructor call with its MorJS-wrapped equivalent:
+
+| Original call | Injected wrapper | Default when cross-compiling |
+|--------------|-----------------|------------------------------|
+| `App({})` | MorJS app runtime | `true` |
+| `Page({})` | MorJS page runtime | `true` |
+| `Component({})` | MorJS component runtime | `true` |
+| `Behavior({})` | MorJS behavior runtime | `true` (non-Alipay source) |
+| `Mixin({})` | MorJS mixin runtime | `true` (Alipay source only) |
+
+To disable injection for a specific constructor:
+
+```typescript
+export default defineConfig([
+  {
+    target: 'alipay',
+    sourceType: 'wechat',
+    autoInjectRuntime: {
+      app: true,
+      page: true,
+      component: true,
+      behavior: false,  // disable Behavior wrapping
+      api: 'enhanced',
+    }
+  }
+])
+```
+
+Pass `false` to `autoInjectRuntime` to disable all injection entirely.
+
+## GlobalObjectTransformTypes
+
+The `api` key within `autoInjectRuntime` controls how the global object (`wx`, `my`, etc.) is transformed. Three modes are available:
+
+```typescript
+// From packages/plugin-compiler/src/constants.ts
+// enhanced: wx => mor, with full API normalization import
+// lite:     wx => my, replaces all globalObject references
+// minimal:  wx.abc() => my.abc(), replaces function calls only
+export const GlobalObjectTransformTypes = objectEnum([
+  'enhanced',
+  'lite',
+  'minimal'
+])
+```
+
+<AccordionGroup>
+  <Accordion title="enhanced — full API normalization">
+    `wx` is replaced with `mor`, and the MorJS API shim is imported. The shim contains the full API transform config, normalizing method names, parameter keys, and response shapes.
+
+    ```javascript
+    // Source (WeChat)
+    wx.showToast({ title: 'Hello' })
+
+    // Output (Alipay, enhanced)
+    mor.showToast({ title: 'Hello' })  // mor normalizes to my.showToast({ content: 'Hello' })
+    ```
+
+    Use `enhanced` when you need full API compatibility across platforms.
+  </Accordion>
+  <Accordion title="lite — direct global replacement">
+    Every occurrence of the source global object is replaced with the target global object. No import is added; the raw target API is called directly.
+
+    ```javascript
+    // Source (WeChat)
+    wx.showToast({ title: 'Hello' })
+
+    // Output (Alipay, lite)
+    my.showToast({ title: 'Hello' })  // no parameter normalization
+    ```
+
+    Use `lite` when the APIs you call have identical signatures on source and target, and you do not need normalization overhead.
+  </Accordion>
+  <Accordion title="minimal — function call replacement only">
+    Only function call expressions on the global object are rewritten. Property accesses that are not function calls are left as-is.
+
+    ```javascript
+    // Source (WeChat)
+    wx.showToast({ title: 'Hello' })
+    const env = wx.env  // non-call access — unchanged
+
+    // Output (Alipay, minimal)
+    my.showToast({ title: 'Hello' })
+    const env = wx.env  // unchanged
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## createApp / createPage / createComponent
+
+The `@morjs/core` package exports platform-agnostic constructors that wrap the native mini-program constructors with cross-platform adapter chains:
+
+```typescript
+// From packages/core/src/index.ts
+import {
+  createApp, aApp, wApp,
+  createPage, aPage, wPage,
+  createComponent, aComponent, wComponent,
+} from '@morjs/core'
+```
+
+| Export | Description |
+|--------|-------------|
+| `createApp` | Cross-platform `App()` wrapper |
+| `aApp` | Alipay-flavored `App()` wrapper |
+| `wApp` | WeChat-flavored `App()` wrapper |
+| `createPage` | Cross-platform `Page()` wrapper |
+| `aPage` | Alipay-flavored `Page()` wrapper |
+| `wPage` | WeChat-flavored `Page()` wrapper |
+| `createComponent` | Cross-platform `Component()` wrapper |
+| `aComponent` | Alipay-flavored `Component()` wrapper |
+| `wComponent` | WeChat-flavored `Component()` wrapper |
+
+When `autoInjectRuntime` is enabled, MorJS replaces your native `App({})`, `Page({})`, and `Component({})` calls with these wrappers automatically at compile time. You only need to call them explicitly if you opt out of auto-injection.
+
+```javascript
+// With autoInjectRuntime enabled (default):
+// You write:
+Page({ data: {} })
+// MorJS rewrites to:
+createPage({ data: {} })
+
+// With autoInjectRuntime disabled:
+// You write manually:
+import { createPage } from '@morjs/core'
+createPage({ data: {} })
+```
+
+## Runtime source type markers
+
+At compile time, MorJS embeds source type markers to let the runtime know which adapter set to use:
+
+```typescript
+// From packages/plugin-compiler/src/constants.ts
+export const RUNTIME_SOURCE_TYPES = {
+  alipay: 'a',
+  wechat: 'w'
+} as const
+```
+
+These markers drive adapter selection in `@morjs/runtime-mini`'s `initAdapters` function, which registers the appropriate page adapters, component adapters, and API transform configs for the source-to-target combination.
+
+<Note>
+The runtime skips all adapter registration when `sourceType === target`. No overhead is added in same-platform builds.
+</Note>

@@ -1,122 +1,131 @@
 {
   "$schema": "https://mintlify.com/docs.json",
-  "theme": "mint",
-  "name": "Mint Starter Kit",
+  "name": "MorJS",
+  "theme": "palm",
   "colors": {
-    "primary": "#16A34A",
-    "light": "#07C983",
-    "dark": "#15803D"
+    "primary": "#04befb",
+    "light": "#0b94bc",
+    "dark": "#04befb"
   },
-  "favicon": "/favicon.svg",
+  "logo": {
+    "light": "https://media.brand.dev/ffe83ad9-813e-4c5e-a150-8605a9dfc77e.svg",
+    "dark": "https://media.brand.dev/ffe83ad9-813e-4c5e-a150-8605a9dfc77e.svg"
+  },
+  "navbar": {
+    "primary": {
+      "type": "github",
+      "href": "https://github.com/eleme/morjs"
+    }
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/eleme/morjs"
+    }
+  },
   "navigation": {
     "tabs": [
       {
-        "tab": "Guides",
+        "tab": "Documentation",
         "groups": [
           {
-            "group": "Getting started",
+            "group": "Introduction",
             "pages": [
-              "index",
-              "quickstart",
-              "development"
+              "introduction/overview",
+              "introduction/architecture",
+              "introduction/getting-started"
             ]
           },
           {
-            "group": "Customization",
+            "group": "Core Concepts",
             "pages": [
-              "essentials/settings",
-              "essentials/navigation"
+              "concepts/multi-platform",
+              "concepts/dsl-support",
+              "concepts/compile-modes",
+              "concepts/compile-types",
+              "concepts/runtime"
             ]
           },
           {
-            "group": "Writing content",
+            "group": "Guides",
             "pages": [
-              "essentials/markdown",
-              "essentials/code",
-              "essentials/images",
-              "essentials/reusable-snippets"
+              "guides/installation",
+              "guides/project-setup",
+              "guides/configuration",
+              "guides/compile-targets",
+              "guides/web-compilation",
+              "guides/subpackages",
+              "guides/plugins"
             ]
           },
           {
-            "group": "AI tools",
+            "group": "Advanced",
             "pages": [
-              "ai-tools/cursor",
-              "ai-tools/claude-code",
-              "ai-tools/windsurf"
+              "advanced/plugin-development",
+              "advanced/custom-compiler-plugins",
+              "advanced/module-sharing",
+              "advanced/conditional-compile",
+              "advanced/css-class-compression",
+              "advanced/phantom-dependency"
+            ]
+          },
+          {
+            "group": "Migration",
+            "pages": [
+              "migration/wechat-to-alipay",
+              "migration/alipay-to-wechat"
+            ]
+          },
+          {
+            "group": "Community",
+            "pages": [
+              "community/contributing",
+              "community/changelog"
             ]
           }
         ]
       },
       {
-        "tab": "API reference",
+        "tab": "API Reference",
         "groups": [
           {
-            "group": "API documentation",
+            "group": "CLI",
             "pages": [
-              "api-reference/introduction"
+              "api/cli/overview",
+              "api/cli/compile",
+              "api/cli/compose"
             ]
           },
           {
-            "group": "Endpoint examples",
+            "group": "Configuration",
             "pages": [
-              "api-reference/endpoint/get",
-              "api-reference/endpoint/create",
-              "api-reference/endpoint/delete",
-              "api-reference/endpoint/webhook"
+              "api/config/mor-config",
+              "api/config/compiler-options",
+              "api/config/web-options"
+            ]
+          },
+          {
+            "group": "Runtime API",
+            "pages": [
+              "api/runtime/app",
+              "api/runtime/page",
+              "api/runtime/component",
+              "api/runtime/plugin"
+            ]
+          },
+          {
+            "group": "Packages",
+            "pages": [
+              "api/packages/cli",
+              "api/packages/core",
+              "api/packages/plugin-compiler",
+              "api/packages/plugin-composer",
+              "api/packages/runtime-mini",
+              "api/packages/runtime-web",
+              "api/packages/takin"
             ]
           }
         ]
       }
-    ],
-    "global": {
-      "anchors": [
-        {
-          "anchor": "Documentation",
-          "href": "https://mintlify.com/docs",
-          "icon": "book-open-cover"
-        },
-        {
-          "anchor": "Blog",
-          "href": "https://mintlify.com/blog",
-          "icon": "newspaper"
-        }
-      ]
-    }
-  },
-  "logo": {
-    "light": "/logo/light.svg",
-    "dark": "/logo/dark.svg"
-  },
-  "navbar": {
-    "links": [
-      {
-        "label": "Support",
-        "href": "mailto:hi@mintlify.com"
-      }
-    ],
-    "primary": {
-      "type": "button",
-      "label": "Dashboard",
-      "href": "https://dashboard.mintlify.com"
-    }
-  },
-  "contextual": {
-    "options": [
-     "copy",
-     "view",
-     "chatgpt",
-     "claude",
-     "perplexity",
-     "mcp",
-     "cursor",
-     "vscode"
-   ]
-  },
-  "footer": {
-    "socials": {
-      "x": "https://x.com/mintlify",
-      "github": "https://github.com/mintlify",
-      "linkedin": "https://linkedin.com/company/mintlify"
-    }
+    ]
   }
 }

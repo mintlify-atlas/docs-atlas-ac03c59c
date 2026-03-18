@@ -1,0 +1,214 @@
+---
+title: "Plugin API"
+description: "Runtime API for creating mini-program plugins (not framework plugins) and converting pages to components."
+---
+
+The Plugin API provides utilities for building mini-program plugin packages that communicate with a host mini-program, and helper functions for converting page configurations into component configurations.
+
+<Note>
+This page documents the **runtime plugin API** (`@morjs/core`). For the build-time framework plugin API used with Takin, see the [Takin package reference](/api/packages/takin).
+</Note>
+
+## Functions
+
+### `createPlugin`
+
+Creates a MorJS mini-program plugin object. The returned object handles two-way communication between the plugin mini-program and its host.
+
+```ts
+function createPlugin(pluginOptions: {
+  getApp: GlobalGetApp
+  [k: string]: any
+}): CreateMorPluginResult
+```
+
+<ParamField path="pluginOptions.getApp" type="GlobalGetApp" required>
+  The platform `getApp` function available inside the plugin. MorJS uses it to access the plugin's own app instance and inject host events.
+</ParamField>
+
+<ParamField path="pluginOptions" type="Record<string, any>">
+  Any additional properties are spread onto the returned plugin object.
+</ParamField>
+
+```ts
+import { createPlugin } from '@morjs/core'
+
+const plugin = createPlugin({
+  getApp,
+  // expose a method to the host mini-program
+  greet(name: string) {
+    return `Hello, ${name}`
+  }
+})
+
+export default plugin
+```
+
+---
+
+### `aPlugin`
+
+Alias for `createPlugin`. Use when your plugin source DSL is Alipay.
+
+```ts
+function aPlugin(
+  ...args: Parameters<typeof createPlugin>
+): ReturnType<typeof createPlugin>
+```
+
+---
+
+### `wPlugin`
+
+Alias for `createPlugin`. Use when your plugin source DSL is WeChat.
+
+```ts
+function wPlugin(
+  ...args: Parameters<typeof createPlugin>
+): ReturnType<typeof createPlugin>
+```
+
+---
+
+### `PageToComponent`
+
+Converts a page options object into a component options object. Useful for rendering a page inside another page or component.
+
+```ts
+function PageToComponent<D extends IData, T extends IData>(
+  pageOptions: MorPageOptions<D, T>,
+  sourceType: SOURCE_TYPE,
+  features?: MorComponentEnhanceFeatures
+): IData
+```
+
+<ParamField path="pageOptions" type="MorPageOptions<D, T>" required>
+  The page configuration to convert.
+</ParamField>
+
+<ParamField path="sourceType" type="SOURCE_TYPE" required>
+  DSL source type (`SOURCE_TYPE.ALIPAY` or `SOURCE_TYPE.WECHAT`).
+</ParamField>
+
+<ParamField path="features" type="MorComponentEnhanceFeatures">
+  Component enhancement feature flags. `invokeComponentHooks` defaults to `false` when using `PageToComponent`.
+</ParamField>
+
+<ResponseField name="return" type="IData">
+  Enhanced component options ready to pass to `Component()`.
+</ResponseField>
+
+The following lifecycle mappings are applied automatically:
+
+| Page lifetime | Component lifetime (Alipay) | Component lifetime (WeChat) |
+|---|---|---|
+| `onLoad` | `onInit` | `attached` |
+| `onReady` | `didMount` | `ready` |
+| `onUnload` | `didUnmount` | `detached` |
+| `onShow` | `pageLifetimes.show` | `pageLifetimes.show` |
+| `onHide` | `pageLifetimes.hide` | `pageLifetimes.hide` |
+| `onResize` | `pageLifetimes.resize` | `pageLifetimes.resize` |
+
+---
+
+### `aPageToComponent`
+
+Converts an Alipay-style page into component options.
+
+```ts
+function aPageToComponent<D extends IData, T extends IData>(
+  options: MorPageOptions<D, T>,
+  features?: MorComponentEnhanceFeatures
+): any
+```
+
+```ts
+import { aPageToComponent } from '@morjs/core'
+
+// Use a page as a component in an Alipay mini-program
+const componentOptions = aPageToComponent({
+  data: { title: 'Embedded Page' },
+  onLoad() {
+    console.log('loaded as component')
+  }
+})
+```
+
+---
+
+### `wPageToComponent`
+
+Converts a WeChat-style page into component options.
+
+```ts
+function wPageToComponent<D extends IData, T extends IData>(
+  options: MorPageOptions<D, T>,
+  features?: MorComponentEnhanceFeatures
+): any
+```
+
+---
+
+### `init`
+
+Initialises the MorJS runtime by loading solutions and returning the resulting hooks and plugin names. Called internally by `createApp` but can also be called manually in environments without a native `App()` constructor.
+
+```ts
+function init(
+  solution?: MorSolution | MorSolution[]
+): { $hooks: MorHooks; pluginsNames: string[] }
+```
+
+<ParamField path="solution" type="MorSolution | MorSolution[]">
+  One or more runtime solutions to load.
+</ParamField>
+
+<ResponseField name="$hooks" type="MorHooks">
+  The initialised hooks instance used by App, Page, and Component.
+</ResponseField>
+
+<ResponseField name="pluginsNames" type="string[]">
+  Names of all plugins that were loaded.
+</ResponseField>
+
+---
+
+## Types
+
+### `CreateMorPluginResult`
+
+```ts
+interface CreateMorPluginResult {
+  $pluginEvent?: Emitter<any>
+  $hostEvent?: Emitter<any>
+  $isMorPlugin: true
+  getApp: GlobalGetApp
+  internalInit(options?: { $event?: Emitter<any> }): void
+  morInit<T extends Record<string, any>>(extend: T): void
+  [k: string]: any
+}
+```
+
+<ResponseField name="$pluginEvent" type="Emitter<any>">
+  The plugin's own event emitter (the `$event` from the plugin's app instance), set at creation time if the plugin app already has `$event`.
+</ResponseField>
+
+<ResponseField name="$hostEvent" type="Emitter<any>">
+  The host mini-program's event emitter. Set when `internalInit` is called by the host.
+</ResponseField>
+
+<ResponseField name="$isMorPlugin" type="true" required>
+  Marker flag that identifies this object as a MorJS plugin.
+</ResponseField>
+
+<ResponseField name="getApp" type="GlobalGetApp" required>
+  Reference to the platform `getApp` function scoped to the plugin.
+</ResponseField>
+
+<ResponseField name="internalInit" type="(options?: { $event?: Emitter<any> }) => void">
+  Called by the host mini-program to inject its `$event` emitter into the plugin. Sets `$hostEvent` on both the plugin object and the plugin's app instance.
+</ResponseField>
+
+<ResponseField name="morInit" type="<T extends Record<string, any>>(extend: T) => void">
+  Called by the host to inject capabilities into the plugin. Properties in `extend` are merged onto `app.$host`.
+</ResponseField>

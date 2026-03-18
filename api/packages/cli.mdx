@@ -1,0 +1,101 @@
+---
+title: "@morjs/cli"
+description: "The MorJS command-line interface. Provides the `mor` and `morjs` commands that drive compilation, composition, scaffolding, and analysis."
+---
+
+## Overview
+
+`@morjs/cli` is the entry-point package for the MorJS toolchain. It bundles all first-party plugins and exposes them through two executable commands.
+
+| Property | Value |
+|---|---|
+| **Package** | `@morjs/cli` |
+| **Version** | `1.0.113` |
+| **License** | MIT |
+| **Node** | `>= 12.13.0` |
+
+## Installation
+
+```bash
+npm install --save-dev @morjs/cli
+# or
+npm install -g @morjs/cli
+```
+
+## Binary commands
+
+| Binary | Resolves to |
+|---|---|
+| `mor` | `./bin/cli.js` |
+| `morjs` | `./bin/cli.js` |
+
+Both binaries are identical; `morjs` is provided as an alias for environments where `mor` may conflict with another tool.
+
+## Usage
+
+```bash
+# compile a mini-program
+mor compile --target wechat
+
+# compose (integrate) multiple mini-program modules
+mor compose
+
+# generate a new project from a template
+mor generate
+
+# run the development server
+mor compile --target wechat --watch
+```
+
+## Bundled dependencies
+
+`@morjs/cli` ships with the following first-party packages as direct dependencies. You do not need to install them separately.
+
+<CardGroup cols={2}>
+  <Card title="@morjs/plugin-compiler" href="/api/packages/plugin-compiler">
+    `1.0.113` — Webpack-based multi-target mini-program compiler.
+  </Card>
+  <Card title="@morjs/plugin-composer" href="/api/packages/plugin-composer">
+    `1.0.72` — Multi-module mini-program composition engine.
+  </Card>
+  <Card title="@morjs/plugin-analyzer">
+    `1.0.71` — Bundle size analysis.
+  </Card>
+  <Card title="@morjs/plugin-generator">
+    `1.0.71` — Project and file scaffolding.
+  </Card>
+  <Card title="@morjs/plugin-mocker">
+    `1.0.71` — API mocking for development.
+  </Card>
+  <Card title="@morjs/utils">
+    `1.0.71` — Shared utilities used across all MorJS packages.
+  </Card>
+</CardGroup>
+
+Third-party runtime dependencies included in the CLI bundle:
+
+- **`v8-compile-cache`** `^2.3.0` — Speeds up Node.js startup by caching compiled V8 bytecode.
+- **`youch`** `^3.2.2` — Pretty-prints Node.js error stacks.
+- **`youch-terminal`** `^2.1.5` — Terminal rendering for `youch` output.
+
+## Programmatic usage
+
+Behind every `mor` command is a `Takin` instance. You can replicate CLI behaviour programmatically:
+
+```ts
+import takin from '@morjs/takin'
+import MorCompilerPlugin from '@morjs/plugin-compiler'
+import MorComposerPlugin from '@morjs/plugin-composer'
+
+const cli = takin('mor')
+
+cli.use([
+  new MorCompilerPlugin(),
+  new MorComposerPlugin()
+])
+
+await cli.run(
+  { name: 'compile', options: { target: 'wechat' } },
+  [{ sourceType: 'alipay', target: 'wechat' }]
+)
+```

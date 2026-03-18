@@ -1,0 +1,259 @@
+---
+title: mor compile
+description: Full reference for the mor compile command, including all flags, defaults, and usage examples.
+---
+
+The `compile` command transforms your mini-program source into one or more target platform outputs.
+
+```bash
+mor compile [options]
+```
+
+<Note>
+  `mor compile` reads your `mor.config.ts` file. CLI flags override the corresponding config file values when both are present.
+</Note>
+
+## Source and target
+
+<ParamField path="--source-type" type="string">
+  The DSL used in your source code. MorJS auto-detects this from `.wxml` or `.axml` file extensions. Set explicitly if both file types exist in the same directory.
+
+  Accepted values: `wechat`, `alipay`
+</ParamField>
+
+<ParamField path="-t, --target" type="string">
+  The platform to compile to. Each target has its own default output directory (for example, `dist/wechat`).
+
+  Accepted values: `wechat`, `alipay`, `baidu`, `bytedance`, `qq`, `kuaishou`, `taobao`, `dingding`, `web`
+</ParamField>
+
+<ParamField path="--compile-mode" type="string" default="bundle">
+  Controls how modules and dependencies are processed.
+
+  - `bundle` — Full webpack bundling. Resolves and inlines npm packages. Recommended for production.
+  - `transform` — Source-only conversion. Does not process npm dependencies. Useful for library authors.
+
+  Accepted values: `bundle`, `transform`
+</ParamField>
+
+<ParamField path="--compile-type" type="string" default="miniprogram">
+  The artifact type to produce. Each type uses a different entry config file.
+
+  | Value | Entry file |
+  |-------|------------|
+  | `miniprogram` | `app.json` |
+  | `plugin` | `plugin.json` |
+  | `subpackage` | `subpackage.json` |
+  | `component` | `component.json` |
+
+  Accepted values: `miniprogram`, `plugin`, `subpackage`, `component`
+</ParamField>
+
+## Paths
+
+<ParamField path="-s, --src-path" type="string" default="./src">
+  Root directory of your source code.
+</ParamField>
+
+<ParamField path="-o, --output-path" type="string">
+  Directory where compiled output is written. Defaults to `dist/<target>` when not set (for example, `dist/wechat`).
+</ParamField>
+
+<ParamField path="--ignore" type="string">
+  A file or directory path to exclude from compilation. Output directories are added to the ignore list automatically. Pass the flag multiple times to ignore multiple paths.
+</ParamField>
+
+## Build mode
+
+<ParamField path="--mode" type="string" default="development">
+  Sets the build mode, which affects defaults for caching, minification, and source maps. Mirrors webpack's `mode` option.
+
+  Accepted values: `production`, `development`, `none`
+</ParamField>
+
+<ParamField path="--production" type="boolean">
+  Shorthand for `--mode production`. Automatically enables minimization.
+</ParamField>
+
+<ParamField path="-w, --watch" type="boolean" default="false">
+  Enable watch mode. MorJS recompiles affected files when changes are detected.
+</ParamField>
+
+<ParamField path="--auto-clean" type="boolean" default="false">
+  Delete the output directory before each build.
+</ParamField>
+
+## Caching
+
+<ParamField path="--cache" type="boolean">
+  Enable the build cache. Defaults to `true` in `development` mode and `false` in `production` mode.
+</ParamField>
+
+<ParamField path="--no-cache" type="boolean">
+  Disable the build cache.
+</ParamField>
+
+## Source maps (devtool)
+
+<ParamField path="-d, --devtool" type="string">
+  Control source map generation. Accepts any [webpack devtool](https://webpack.js.org/configuration/devtool/) value, for example `source-map`, `eval-cheap-source-map`, or `inline-source-map`.
+
+  Pass the flag without a value to use webpack's default for the current mode.
+</ParamField>
+
+<ParamField path="--no-devtool" type="boolean">
+  Disable source map generation entirely.
+</ParamField>
+
+## Minification
+
+<ParamField path="--minimize" type="boolean">
+  Enable output minification. Automatically enabled when `--production` is set.
+</ParamField>
+
+<ParamField path="--js-minimizer" type="string" default="true">
+  Choose the JavaScript minimizer.
+
+  Accepted values: `terser`, `esbuild`, `swc`
+
+  Pass without a value to use the default minimizer.
+</ParamField>
+
+<ParamField path="--no-js-minimizer" type="boolean">
+  Disable JavaScript minification.
+</ParamField>
+
+<ParamField path="--css-minimizer" type="string" default="esbuild">
+  Choose the CSS minimizer.
+
+  Accepted values: `esbuild`, `csso`, `cssnano`, `cleancss`, `parcelcss`
+
+  Pass without a value to use the default minimizer (`esbuild`).
+</ParamField>
+
+<ParamField path="--no-css-minimizer" type="boolean">
+  Disable CSS minification.
+</ParamField>
+
+<ParamField path="--xml-minimizer" type="boolean">
+  Enable template (XML/WXML/AXML) minification using `html-terser`.
+</ParamField>
+
+<ParamField path="--no-xml-minimizer" type="boolean">
+  Disable template minification.
+</ParamField>
+
+## Runtime and dependencies
+
+<ParamField path="--process-node-modules" type="boolean">
+  Process and cross-compile components inside `node_modules`. Disabled by default. Enable this when using multi-platform component libraries.
+</ParamField>
+
+<ParamField path="--global-object" type="string">
+  Override the global object name used by the target platform (for example, `wx` for WeChat, `my` for Alipay). Each target has a sensible default; you rarely need to set this manually.
+</ParamField>
+
+## Bundle analysis
+
+<ParamField path="--analyze" type="boolean">
+  Open a bundle analysis report using `webpack-bundle-analyzer`. The server starts at `http://127.0.0.1:8888` by default.
+</ParamField>
+
+## Compose integration flags
+
+The following flags are available when `compose: true` is set in your config, or when running `mor compile` in a project with compose configuration.
+
+<ParamField path="--with-modules" type="string">
+  Specify which modules to include in the integration step. Accepts glob patterns.
+</ParamField>
+
+<ParamField path="--without-modules" type="string">
+  Exclude modules from the integration step. Accepts glob patterns.
+</ParamField>
+
+<ParamField path="--from-state" type="number">
+  Set the initial state for module integration. Accepts values from `0` (initial) to `6` (composed).
+</ParamField>
+
+<ParamField path="--to-state" type="number">
+  Set the final state for module integration. Accepts values from `0` (initial) to `6` (composed).
+</ParamField>
+
+<ParamField path="--concurrency" type="number">
+  Maximum number of modules to process in parallel during integration.
+</ParamField>
+
+<ParamField path="--combine-modules" type="boolean">
+  Merge all subpackage pages into the main package instead of keeping them as separate subpackages.
+</ParamField>
+
+## Usage examples
+
+<CodeGroup>
+
+```bash Development build (WeChat)
+mor compile --target wechat
+```
+
+```bash Production build with minification
+mor compile --target wechat --production
+```
+
+```bash Watch mode for local development
+mor compile --target wechat --watch
+```
+
+```bash Compile Alipay source to Alipay
+mor compile --source-type alipay --target alipay
+```
+
+```bash Cross-compile WeChat source to Alipay
+mor compile --source-type wechat --target alipay
+```
+
+```bash Build a subpackage
+mor compile --compile-type subpackage --target wechat
+```
+
+```bash Production build with bundle analysis
+mor compile --target wechat --production --analyze
+```
+
+```bash Transform mode (no npm bundling)
+mor compile --target wechat --compile-mode transform
+```
+
+</CodeGroup>
+
+## Multiple targets via config
+
+To compile to several platforms in a single command, export an array from `mor.config.ts`:
+
+```typescript mor.config.ts
+import { defineConfig } from '@morjs/cli'
+
+export default defineConfig([
+  {
+    name: 'wechat',
+    sourceType: 'wechat',
+    target: 'wechat',
+    compileMode: 'bundle'
+  },
+  {
+    name: 'alipay',
+    sourceType: 'wechat',
+    target: 'alipay',
+    compileMode: 'bundle'
+  }
+])
+```
+
+Then run:
+
+```bash
+mor compile
+```
+
+<Card title="Compiler options reference →" icon="gear" href="/api/config/compiler-options">
+  Full documentation for all compiler configuration fields available in `mor.config.ts`.
+</Card>

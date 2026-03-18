@@ -1,0 +1,138 @@
+---
+title: Subpackages
+description: Compile mini-program subpackages independently and share modules between main and sub packages.
+---
+
+## What are subpackages?
+
+Mini-programs support splitting the application into a main package and one or more subpackages. Subpackages are downloaded on demand, keeping the initial load size small. Each subpackage is defined in `app.json` under `subPackages`.
+
+MorJS supports compiling subpackages independently via `compileType: 'subpackage'`, with a dedicated `subpackage.json` entry file.
+
+## Subpackage entry file
+
+When `compileType` is `subpackage`, MorJS looks for `subpackage.json` as the entry (instead of `app.json`). This file declares the pages belonging to the subpackage:
+
+```json src/subpackage.json
+{
+  "root": "packageA",
+  "pages": [
+    "pages/feature/index",
+    "pages/detail/index"
+  ]
+}
+```
+
+## Compiling a subpackage
+
+Set `compileType: 'subpackage'` in `mor.config.ts`:
+
+```typescript mor.config.ts
+import { defineConfig } from '@morjs/cli'
+
+export default defineConfig({
+  name: 'subpackage-alipay',
+  sourceType: 'alipay',
+  target: 'alipay',
+  compileType: 'subpackage',
+  srcPath: './src',
+  outputPath: 'dist/alipay'
+})
+```
+
+Or pass it on the CLI:
+
+```bash
+mor compile --compile-type subpackage --target alipay
+```
+
+## Independent subpackages
+
+An independent subpackage can run without the main package being downloaded first. MorJS compiles it with its own app init file.
+
+```json src/subpackage.json
+{
+  "root": "packageA",
+  "independent": true,
+  "pages": [
+    "pages/standalone/index"
+  ]
+}
+```
+
+MorJS detects the `independent` flag and creates an isolated compilation context for the subpackage so its runtime does not depend on the main package.
+
+## Custom entry files
+
+Use `customEntries` to point to a non-standard location for any of the entry config files:
+
+```typescript
+{
+  compileType: 'subpackage',
+  customEntries: {
+    'subpackage.json': './config/my-subpackage.json'
+  }
+}
+```
+
+You can also declare additional pages or components that have no import chain from the entry but should still be compiled:
+
+```typescript
+{
+  customEntries: {
+    pages: ['pages/extra/index'],
+    components: ['components/shared/button']
+  }
+}
+```
+
+## Module sharing between main and subpackages
+
+When the main package and subpackages are developed in separate repositories and assembled at integration time, you can avoid duplicating shared npm modules using `shared` and `consumes`.
+
+### `shared` — main package exposes modules
+
+The main package declares which npm modules it will share at runtime:
+
+```typescript mor.config.ts (main package)
+{
+  compileType: 'miniprogram',
+  shared: ['@morjs/core', 'lodash']
+}
+```
+
+Modules listed in `shared` are included in the main package bundle and exposed under a predictable global name so subpackages can reference them without rebundling.
+
+### `consumes` — subpackage uses shared modules
+
+The subpackage declares which modules to consume from the main package instead of bundling them locally:
+
+```typescript mor.config.ts (subpackage)
+{
+  compileType: 'subpackage',
+  consumes: ['@morjs/core', 'lodash']
+}
+```
+
+<Warning>
+  The `shared` and `consumes` arrays must list the same packages. If a consumed module is not present in the main package's `shared` list, the subpackage will fail at runtime.
+</Warning>
+
+### Named module mapping
+
+You can alias a module when sharing or consuming it:
+
+```typescript
+{
+  shared: [
+    { 'lodash': 'lodash-es' }  // expose lodash-es as 'lodash'
+  ],
+  consumes: [
+    { 'lodash': 'lodash-es' }
+  ]
+}
+```
+
+## Integration with plugin-composer
+
+For larger multi-team projects, `@morjs/plugin-composer` automates the assembly of main and subpackage outputs into a single deliverable. It works in conjunction with `compileType: 'subpackage'` compilation. See the [Plugins guide](/guides/plugins) for setup details.

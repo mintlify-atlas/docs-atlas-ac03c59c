@@ -1,0 +1,229 @@
+---
+title: Changelog
+description: Recent release history for MorJS. All notable changes are documented here following Conventional Commits.
+---
+
+All notable changes to MorJS packages are documented below.
+Entries follow [Conventional Commits](https://conventionalcommits.org).
+For the full history, see the
+[CHANGELOG.md on GitHub](https://github.com/eleme/morjs/blob/main/CHANGELOG.md).
+
+---
+
+## [1.0.113](https://github.com/eleme/morjs/compare/v1.0.112...v1.0.113) — 2024-05-21
+
+### Bug Fixes
+
+- **plugin-compiler-alipay:** Fixed `input` event not firing when compiling Alipay → WeChat. ([971810c](https://github.com/eleme/morjs/commit/971810cc5fee33025faaa7ba54fcd17f23ecdff5))
+- **runtime-mini:** Removed the erroneous `saveImageToPhotosAlbum` → `saveImage` transform that was applied in Alipay-to-WeChat scenarios. ([7a00597](https://github.com/eleme/morjs/commit/7a0059702bd424ecde2abaf0e960bbc8a1d84fe7))
+
+---
+
+## [1.0.112](https://github.com/eleme/morjs/compare/v1.0.111...v1.0.112) — 2024-05-10
+
+### Features
+
+- **plugin-compiler:** Added `web-pro` target recognition and compilation support.
+- **plugin-compiler:** Added `.css` file type compilation support.
+- **plugin-compiler:** Added custom `template render` hook support.
+- **plugin-compiler:** `web-pro` builds no longer emit `.json` output files.
+- **runtime-web:** Exported runtime method shorthand aliases.
+
+### Bug Fixes
+
+- **runtime-web:** Fixed vertical alignment issue caused by incorrect line-height.
+
+---
+
+## [1.0.111](https://github.com/eleme/morjs/compare/v1.0.110...v1.0.111) — 2024-05-06
+
+### Features
+
+- **runtime-web:** `<textarea>` height now auto-updates when `value` is changed via props.
+
+---
+
+## [1.0.110](https://github.com/eleme/morjs/compare/v1.0.109...v1.0.110) — 2024-04-26
+
+### Features
+
+- **plugin-compiler-web:** `@import` statements inside style files can now be written to the output style file.
+- **plugin-compiler-web:** TabBar is now compatible with WeChat usage patterns when compiling to web.
+- **plugin-compiler:** CSS class name compression now allows business-defined priority to take precedence during short class name generation.
+- **plugin-compiler:** Runtime method replacement now handles `return` statements correctly (with enhanced detection).
+- **runtime-web:** `loading` component styles updated to align with the latest Alipay style.
+- **runtime-web:** TabBar now handles the case where no `icon` is configured.
+
+### Bug Fixes
+
+- **plugin-compiler-web:** Fixed empty-value fallback when reading user config.
+
+---
+
+## [1.0.109](https://github.com/eleme/morjs/compare/v1.0.108...v1.0.109) — 2024-04-18
+
+### Bug Fixes
+
+- **plugin-compiler:** Fixed regex `lastIndex` not being reset when validating class names during CSS compression, causing intermittent match failures.
+- **plugin-compiler:** CSS compression now supports hyphen-connected class names and multiple adjacent variable expressions.
+
+---
+
+## [1.0.108](https://github.com/eleme/morjs/compare/v1.0.107...v1.0.108) — 2024-04-15
+
+### Features
+
+- **plugin-compiler-web / runtime-web:** Navigation bar and status bar height can now be changed dynamically.
+- **plugin-compiler:** Added support for WeChat-specific class name usage patterns.
+
+---
+
+## [1.0.107](https://github.com/eleme/morjs/compare/v1.0.106...v1.0.107) — 2024-04-11
+
+### Features
+
+- **plugin-compiler:** CSS compression now handles more dynamic class binding scenarios.
+
+---
+
+## [1.0.106](https://github.com/eleme/morjs/compare/v1.0.105...v1.0.106) — 2024-04-03
+
+### Features
+
+- **plugin-compiler-alipay:** Custom tabBar component directory is now adjusted based on the compile target.
+- **plugin-compiler-alipay:** Custom tabBar attribute mapping added for mini-programs.
+- **runtime-mini:** The `getTabBar` method is now marked as supported.
+- **runtime-web:** `rich-text` extended attribute support added.
+
+---
+
+## [1.0.104](https://github.com/eleme/morjs/compare/v1.0.103...v1.0.104) — 2024-04-02
+
+### Features
+
+- **plugin-compiler-web / runtime-web:** `selectOwnerComponent` API support added.
+- **plugin-compiler-web / runtime-web:** `createInnerAudioContext` added.
+
+### Bug Fixes
+
+- **runtime-web / plugin-compiler-web:** Fixed TypeScript errors.
+
+---
+
+## [1.0.103](https://github.com/eleme/morjs/compare/v1.0.102...v1.0.103) — 2024-03-25
+
+### Features
+
+- **plugin-compiler:** Optimised class name splitting logic.
+- **plugin-compiler:** Improved file path suffix removal logic.
+- **plugin-compiler:** Added `disableDynamicClassDetection` parameter to allow opting out of dynamic class name detection.
+- **plugin-compiler-baidu:** Removed type-check warning for Baidu targets.
+
+---
+
+## [1.0.102](https://github.com/eleme/morjs/compare/v1.0.101...v1.0.102) — 2024-03-22
+
+### Features
+
+- **plugin-compiler-web:** CSS `class` attribute now supports ternary expressions when `styleScope` is enabled.
+- **plugin-compiler-web:** Conditional rendering now supports ternary expressions.
+- **runtime-web:** TabBar can now be changed dynamically at runtime.
+
+---
+
+## [1.0.101](https://github.com/eleme/morjs/compare/v1.0.100...v1.0.101) — 2024-02-23
+
+### Features
+
+- **runtime-web:** Map event notification mechanism is now compatible with older Safari browsers.
+
+### Bug Fixes
+
+- **runtime-web:** Setting `maxlength` on an `<input type="number">` was being ignored.
+
+---
+
+## [1.0.99](https://github.com/eleme/morjs/compare/v1.0.98...v1.0.99) — 2024-02-19
+
+### Features
+
+- **plugin-compiler:** The `copy` configuration now supports `filter`, `force`, and `context` options.
+
+---
+
+## [1.0.97](https://github.com/eleme/morjs/compare/v1.0.96...v1.0.97) — 2024-01-30
+
+### Features
+
+- **plugin-compiler:** Added `externalsType` customisation support.
+
+### Bug Fixes
+
+- **runtime-web:** Fixed iOS auto-blur issue caused by overly frequent `input` sync.
+
+---
+
+## [1.0.96](https://github.com/eleme/morjs/compare/v1.0.95...v1.0.96) — 2024-01-17
+
+### Features
+
+- **plugin-compiler-web:** `slot` attribute now supports dynamic binding.
+- **runtime-web:** `regionchange` map event now includes the `causedBy` parameter.
+
+---
+
+## [1.0.95](https://github.com/eleme/morjs/compare/v1.0.94...v1.0.95) — 2024-01-16
+
+### Bug Fixes
+
+- **runtime-web:** Multiple `<checkbox>` components on the same page can now be used independently.
+- **runtime-web:** Fixed page not matching when URL was missing a leading `/`.
+
+---
+
+## [1.0.95-beta.1](https://github.com/eleme/morjs/compare/v1.0.95-beta.0...v1.0.95-beta.1) — 2024-01-15
+
+### Features
+
+- **runtime-mini:** `observer` now fires only when data has changed relative to the default value, instead of always firing on first render.
+
+---
+
+## [1.0.95-beta.0](https://github.com/eleme/morjs/compare/v1.0.94...v1.0.95-beta.0) — 2024-01-15
+
+### Features
+
+- **runtime-mini:** Fixed `observer` / `created` timing issue in WeChat-to-Alipay scenarios; fixed component `batchedUpdates` error.
+
+---
+
+## [1.0.90](https://github.com/eleme/morjs/compare/v1.0.89...v1.0.90) — 2023-12-12
+
+### Features
+
+- **plugin-compiler:** Added component-level cross-platform output interoperability. ([#97](https://github.com/eleme/morjs/issues/97))
+
+### Bug Fixes
+
+- **runtime-web:** Fixed `slider` displayed value not matching the configured value. ([#135](https://github.com/eleme/morjs/issues/135))
+
+---
+
+## [1.0.85](https://github.com/eleme/morjs/compare/v1.0.84...v1.0.85) — 2023-11-06
+
+### Features
+
+- **core:** WeChat-to-Alipay page `behaviors` now work correctly. ([#122](https://github.com/eleme/morjs/issues/122))
+- **plugin-compiler-alipay:** WeChat `map` component `polygons` property is now converted to Alipay's `polygon`. ([#124](https://github.com/eleme/morjs/issues/124))
+
+### Bug Fixes
+
+- **runtime-mini:** Added support for `catch`-prefixed event callbacks.
+
+---
+
+<Note>
+  This page shows the most recent entries. For the complete release history,
+  visit the
+  [CHANGELOG on GitHub](https://github.com/eleme/morjs/blob/main/CHANGELOG.md).
+</Note>

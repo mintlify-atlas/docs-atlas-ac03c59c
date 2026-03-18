@@ -1,0 +1,218 @@
+---
+title: "Architecture"
+description: "How MorJS's Takin engine, Runner, plugin system, and compilation pipeline work together."
+---
+
+## High-level overview
+
+MorJS is built in layers. `@morjs/takin` is the lowest-level engine; `@morjs/cli` registers commands and compiler plugins on top of it; your `mor.config.ts` configures what runs.
+
+```
+┌─────────────────────────────────────────────────────┐
+│                    @morjs/cli                       │
+│  defineConfig · mor compile · mor create · …        │
+├─────────────────────────────────────────────────────┤
+│               Plugin ecosystem                      │
+│  plugin-compiler · plugin-composer · plugin-mocker  │
+├─────────────────────────────────────────────────────┤
+│                @morjs/takin                         │
+│     Takin (engine)  →  Runner  →  Hook system       │
+└─────────────────────────────────────────────────────┘
+```
+
+## Takin engine
+
+`Takin` is the main entry class (`packages/takin/src/takin.ts`). It extends `Config`, owns the global lifecycle hooks, and orchestrates one or more `Runner` instances — one per user config entry when multi-config mode is active.
+
+### Takin lifecycle hooks
+
+All hooks are [tapable](https://github.com/webpack/tapable) instances.
+
+| Hook | Type | Description |
+|------|------|-------------|
+| `initialize` | `AsyncSeriesHook<[Takin]>` | Fires after construction, before `run()` processes any config. |
+| `prepare` | `AsyncSeriesHook<RunnerOptions>` | Pre-run preparation phase run through a dedicated inner Runner. Use it for early feature interception. |
+| `configLoaded` | `AsyncSeriesHook<[Takin, CommandOptions]>` | Fires after the config file is loaded from disk. Not called when config is passed directly via API. |
+| `configFiltered` | `AsyncSeriesWaterfallHook<[UserConfig[], CommandOptions]>` | Fires after multi-config filtering. Modify which configs get executed. |
+| `extendRunner` | `SyncWaterfallHook<[typeof Runner, RunnerOptions]>` | Replace or extend the `Runner` class itself before it is instantiated. |
+
+### Run sequence
+
+<Steps>
+  <Step title="initialize">
+    `takin.hooks.initialize` fires. Plugins registered via `takin.use()` have already run their `onUse` callbacks at this point.
+  </Step>
+  <Step title="prepare">
+    A dedicated inner Runner executes `ChangeCwdPlugin`, `LoadEnvPlugin`, `MultiConfigPlugin`, and `PluginConfigPlugin` to load `.env` files, discover the config file, and compute multi-config filters.
+  </Step>
+  <Step title="configLoaded / configFiltered">
+    After the config file is read, `configLoaded` fires. Then `configFiltered` trims the config array based on `--name` filters or index.
+  </Step>
+  <Step title="extendRunner">
+    `extendRunner` allows swapping the Runner class. The result is used for all subsequent Runner instantiations.
+  </Step>
+  <Step title="Runner.run (per config)">
+    A `Runner` is created for each filtered user config and runs independently through its own hook chain.
+  </Step>
+</Steps>
+
+## Runner
+
+Each `Runner` processes a single user config object. It parses the CLI, validates config, then invokes the `run` hook where plugins do their actual work (compilation, mocking, etc.).
+
+### Runner lifecycle hooks
+
+| Hook | Type | Description |
+|------|------|-------------|
+| `initialize` | `SyncHook<Runner>` | Runner is constructed and plugins are loaded. |
+| `cli` | `SyncHook<Cli>` | Register commands and options with the CLI parser. |
+| `matchedCommand` | `AsyncSeriesHook<CommandOptions>` | A CLI command was matched. |
+| `loadConfig` | `AsyncSeriesHook<CommandOptions>` | Load user config from disk. |
+| `modifyUserConfig` | `AsyncSeriesWaterfallHook<[UserConfig, CommandOptions]>` | Transform the resolved user config before validation. |
+| `registerUserConfig` | `AsyncSeriesWaterfallHook<[AnyZodObject, Zod]>` | Register additional zod schema fields for config validation. |
+| `shouldRun` | `SyncBailHook<Runner, boolean>` | Return `false` to abort execution (e.g., for `--help` or `--version`). |
+| `shouldValidateUserConfig` | `SyncBailHook<Runner, boolean>` | Return `false` to skip config validation. |
+| `userConfigValidated` | `AsyncSeriesHook<UserConfig>` | Config has passed validation. |
+| `beforeRun` | `AsyncSeriesHook<Runner>` | Pre-run hook for preparing data needed by commands. |
+| `run` | `HookMap<AsyncParallelHook<CommandOptions>>` | The main execution hook, keyed by command name. |
+| `done` | `AsyncParallelHook<Runner>` | Runner completed successfully. |
+| `failed` | `AsyncSeriesHook<Error>` | Runner encountered an error. |
+| `shutdown` | `AsyncSeriesHook<Runner>` | Runner is being shut down (e.g., during `reload()`). |
+
+## Plugin system
+
+All extensibility in MorJS goes through the `Plugin` interface defined in `packages/takin/src/plugin.ts`:
+
+```typescript
+export interface Plugin {
+  name: string
+  version?: string
+  enforce?: 'pre' | 'post'
+  onUse?: (takin: Takin) => void
+  apply: (runner: Runner) => void
+}
+```
+
+### Plugin execution order
+
+Plugins are sorted into three buckets before the Runner executes:
+
+| Order | Condition | Description |
+|-------|-----------|-------------|
+| 1 | `enforce: 'pre'` | Runs before all other plugins. |
+| 2 | _(no enforce)_ | Normal plugins in registration order. |
+| 3 | `enforce: 'post'` | Runs after all other plugins. |
+
+Within each bucket the original registration order is preserved.
+
+### Plugin registration sources
+
+Plugins can enter the system from multiple sources (`PluginTypes` enum in `packages/takin/src/config.ts`):
+
+| Source | Description |
+|--------|-------------|
+| `use` | Registered via `takin.use([...])` |
+| `config` | Listed in `mor.config.ts` under the `plugins` field |
+| `cli` | Passed via CLI options |
+| `runner` | Passed directly to `Runner.run()` |
+| `auto` | Auto-loaded from `package.json` dependencies by pattern matching |
+
+### Writing a plugin
+
+```typescript
+import { Plugin, Runner } from '@morjs/utils'
+
+const myPlugin: Plugin = {
+  name: 'MyPlugin',
+  enforce: 'pre', // optional: 'pre' | 'post'
+
+  onUse(takin) {
+    // Called once when registered via takin.use()
+    takin.hooks.configFiltered.tap('MyPlugin', (configs, command) => {
+      return configs
+    })
+  },
+
+  apply(runner: Runner) {
+    // Called for each Runner instance
+    runner.hooks.userConfigValidated.tapPromise('MyPlugin', async (userConfig) => {
+      // React to validated config
+    })
+
+    runner.hooks.run.for('compile').tapPromise('MyPlugin', async (command) => {
+      // Execute during the 'compile' command
+    })
+  }
+}
+```
+
+## Compilation pipeline
+
+The `@morjs/plugin-compiler` package drives the build. It hooks into `runner.hooks.run.for('compile')` and runs this pipeline:
+
+```
+Source files (WeChat or Alipay DSL)
+        │
+        ▼
+  Entry Builder
+  (discovers app.json → pages → components)
+        │
+        ▼
+  webpack + custom loaders
+  ┌─────────────────────────────────┐
+  │  preprocessLoader               │
+  │  scriptLoader  (TS → JS)        │
+  │  templateLoader (WXML/AXML →    │
+  │    target template format)      │
+  │  styleLoader  (Less/SCSS → CSS) │
+  │  configLoader (JSON/JSONC/JSON5)│
+  │  sjsLoader    (WXS/SJS)         │
+  │  postprocessLoader              │
+  └─────────────────────────────────┘
+        │
+        ▼
+  Platform compiler plugin
+  (@morjs/plugin-compiler-wechat,
+   @morjs/plugin-compiler-alipay, …)
+        │
+        ▼
+  Platform output
+  (dist/wechat/, dist/alipay/, …)
+```
+
+### Compile modes
+
+The `compileMode` user config field controls how modules are resolved:
+
+| Mode | Description |
+|------|-------------|
+| `bundle` | Full webpack bundling with npm resolution. Recommended for projects using npm packages. |
+| `transform` | Source-only transformation without bundling. Faster for projects where dependencies are pre-bundled. |
+
+<Note>
+  `default` and `transfer` are legacy aliases for `transform`. They produce a warning and are normalized automatically.
+</Note>
+
+### Source types
+
+The `sourceType` field in user config tells the compiler which DSL the source is written in:
+
+- `wechat` — source written in WeChat mini-program syntax
+- `alipay` — source written in Alipay mini-program syntax
+
+## Internal plugins in @morjs/cli
+
+When you install `@morjs/cli`, these plugins are always registered:
+
+| Plugin | Role |
+|--------|------|
+| `CliPlugin` | Registers version/help CLI options, verbose mode, and the default command. |
+| `CleanPlugin` | Cleans the output directory before compilation. |
+| `WebpackPlugin` | Wraps webpack configuration and exposes `webpackWrapper` hook. |
+| `CompilerPlugin` | Entry point for the full compilation pipeline. |
+| `ComposerPlugin` | Handles multi-module composition (integrated mini-programs). |
+| `GeneratorPlugin` | Backs the `mor create` scaffold command. |
+| `AnalyzerPlugin` | Provides bundle analysis output. |
+| `AutoReloadPlugin` | Watches for config changes and triggers `takin.reload()`. |
+| `MockerPlugin` | Provides local API mocking during development. |
+| `PrettyErrorPlugin` | Formats runtime errors for readable terminal output. |

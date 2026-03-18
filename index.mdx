@@ -1,97 +1,92 @@
 ---
-title: "Introduction"
-description: "Welcome to the new home for your documentation"
+title: "MorJS — Cross-Platform Mini-Program Framework"
+description: "Build once with WeChat or Alipay DSL, deploy to 8+ platforms: WeChat, Alipay, Baidu, ByteDance, QQ, Kuaishou, Taobao, DingTalk, and Web."
 ---
 
-## Setting up
+<img
+  src="https://img.alicdn.com/imgextra/i3/O1CN01l7Xw6O1E1K4OCFYmw_!!6000000000291-2-tps-485-350.png"
+  alt="MorJS Logo"
+  width="120"
+/>
 
-Get your documentation site up and running in minutes.
+## What is MorJS?
 
-<Card
-  title="Start here"
-  icon="rocket"
-  href="/quickstart"
-  horizontal
->
-  Follow our three step quickstart guide.
-</Card>
+MorJS (pronounced /mɔːr/, like "more") is an extensible cross-platform mini-program development framework built by Ele.me. Write your mini-program once using either WeChat or Alipay DSL, and MorJS compiles it to run natively on any supported platform.
 
-## Make it yours
-
-Design a docs site that looks great and empowers your users.
-
-<Columns cols={2}>
-  <Card
-    title="Edit locally"
-    icon="pen-to-square"
-    href="/development"
-  >
-    Edit your docs locally and preview them in real time.
+<CardGroup cols={2}>
+  <Card title="Quick Start" icon="rocket" href="/introduction/getting-started">
+    Install MorJS and build your first cross-platform mini-program in minutes.
   </Card>
-  <Card
-    title="Customize your site"
-    icon="palette"
-    href="/essentials/settings"
-  >
-    Customize the design and colors of your site to match your brand.
+  <Card title="Architecture" icon="sitemap" href="/introduction/architecture">
+    Learn how MorJS's plugin system and compiler pipeline work together.
   </Card>
-    <Card
-    title="Set up navigation"
-    icon="map"
-    href="/essentials/navigation"
-  >
-    Organize your docs to help users find what they need and succeed with your product.
+  <Card title="Compile Targets" icon="bullseye" href="/guides/compile-targets">
+    See all supported platforms: WeChat, Alipay, Baidu, ByteDance, Web, and more.
   </Card>
-  <Card
-    title="API documentation"
-    icon="terminal"
-    href="/api-reference/introduction"
-  >
-    Auto-generate API documentation from OpenAPI specifications.
+  <Card title="API Reference" icon="code" href="/api/cli/overview">
+    Full CLI, configuration, and runtime API documentation.
   </Card>
-</Columns>
+</CardGroup>
 
-## Create beautiful pages
+## Key features
 
-Everything you need to create world-class documentation.
+<CardGroup cols={3}>
+  <Card title="Multi-platform" icon="globe">
+    Compile one codebase to WeChat, Alipay, Baidu, ByteDance, QQ, Kuaishou, Taobao, DingTalk mini-programs, and Web.
+  </Card>
+  <Card title="Native DSL" icon="pen-nib">
+    Use standard WeChat or Alipay mini-program DSL — no new language or framework to learn.
+  </Card>
+  <Card title="Plugin system" icon="puzzle-piece">
+    Full lifecycle hooks from source to output. Extend any phase with custom plugins.
+  </Card>
+  <Card title="Bundle & transform modes" icon="layer-group">
+    Choose between bundle mode (full npm resolution) or transform mode (source-only conversion).
+  </Card>
+  <Card title="Runtime normalization" icon="arrows-left-right">
+    Compile-time and runtime diffing smooths over platform differences for a consistent user experience.
+  </Card>
+  <Card title="TypeScript & more" icon="file-code">
+    First-class support for TypeScript, Less, SCSS, JSONC, and JSON5 file types.
+  </Card>
+</CardGroup>
 
-<Columns cols={2}>
-  <Card
-    title="Write with MDX"
-    icon="pen-fancy"
-    href="/essentials/markdown"
-  >
-    Use MDX to style your docs pages.
-  </Card>
-  <Card
-    title="Code samples"
-    icon="code"
-    href="/essentials/code"
-  >
-    Add sample code to demonstrate how to use your product.
-  </Card>
-  <Card
-    title="Images"
-    icon="image"
-    href="/essentials/images"
-  >
-    Display images and other media.
-  </Card>
-  <Card
-    title="Reusable snippets"
-    icon="recycle"
-    href="/essentials/reusable-snippets"
-  >
-    Write once and reuse across your docs.
-  </Card>
-</Columns>
+## Supported platforms
 
-## Need inspiration?
+MorJS can compile your mini-program source to any of these targets:
 
-<Card
-  title="See complete examples"
-  icon="stars"
-  href="https://mintlify.com/customers"
->
-  Browse our showcase of exceptional documentation sites.
+| Target | Platform | Description |
+|--------|----------|-------------|
+| `wechat` | WeChat | 微信小程序 |
+| `alipay` | Alipay | 支付宝小程序 |
+| `baidu` | Baidu | 百度智能小程序 |
+| `bytedance` | ByteDance | 字节跳动小程序 (Douyin) |
+| `qq` | QQ | QQ 小程序 |
+| `kuaishou` | Kuaishou | 快手小程序 |
+| `taobao` | Taobao | 淘宝小程序 |
+| `dingding` | DingTalk | 钉钉小程序 |
+| `web` | Web | H5 Web application |
+
+## Get started in minutes
+
+<Steps>
+  <Step title="Install the CLI">
+    ```bash
+    npm install -g @morjs/cli
+    ```
+  </Step>
+  <Step title="Create a new project">
+    ```bash
+    mor create my-app
+    ```
+  </Step>
+  <Step title="Compile to your target platform">
+    ```bash
+    mor compile --target wechat
+    ```
+  </Step>
+</Steps>
+
+<Card title="Read the full getting started guide →" icon="arrow-right" href="/introduction/getting-started">
+  Covers installation, project structure, configuration, and your first compile.
 </Card>

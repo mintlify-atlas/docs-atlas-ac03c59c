@@ -1,0 +1,146 @@
+---
+title: Compile Targets
+description: All supported compile targets, their default output paths, and how to select them.
+---
+
+## Supported targets
+
+MorJS can compile your mini-program source to the following platforms:
+
+| Target | Platform | Global object | Default output |
+|--------|----------|---------------|----------------|
+| `alipay` | Alipay mini-program | `my` | `dist/alipay` |
+| `wechat` | WeChat mini-program | `wx` | `dist/wechat` |
+| `baidu` | Baidu mini-program | `swan` | `dist/baidu` |
+| `bytedance` | ByteDance (Douyin/Toutiao) | `tt` | `dist/bytedance` |
+| `qq` | QQ mini-program | `qq` | `dist/qq` |
+| `taobao` | Taobao mini-program | `my` | `dist/taobao` |
+| `dingding` | DingTalk mini-program | `dd` | `dist/dingding` |
+| `kuaishou` | Kuaishou mini-program | `ks` | `dist/kuaishou` |
+| `web` | Web application (H5) | `myPro` | `dist/web` |
+
+## Setting the target
+
+### In `mor.config.ts`
+
+```typescript mor.config.ts
+import { defineConfig } from '@morjs/cli'
+
+export default defineConfig({
+  sourceType: 'wechat',
+  target: 'alipay'
+})
+```
+
+### Via CLI flag
+
+The `-t` / `--target` flag overrides the config file value:
+
+```bash
+mor compile --target wechat
+mor compile --target alipay
+mor compile --target web
+mor compile -t baidu
+```
+
+## Compiling to multiple targets
+
+Pass an array to `defineConfig` to compile all targets in a single `mor compile` invocation:
+
+```typescript mor.config.ts
+import { defineConfig } from '@morjs/cli'
+
+export default defineConfig([
+  {
+    name: 'wechat',
+    sourceType: 'wechat',
+    target: 'wechat'
+  },
+  {
+    name: 'alipay',
+    sourceType: 'wechat',
+    target: 'alipay'
+  },
+  {
+    name: 'tt',
+    sourceType: 'wechat',
+    target: 'bytedance'
+  },
+  {
+    name: 'baidu',
+    sourceType: 'wechat',
+    target: 'baidu'
+  }
+])
+```
+
+To compile only one config from the array during development, use `--name`:
+
+```bash
+mor compile --name wechat -w
+mor compile --name alipay -w
+```
+
+## Custom output path
+
+Each target has its own default output directory. Override it per config or on the CLI:
+
+```typescript
+{
+  target: 'wechat',
+  outputPath: 'dist/wx-custom'
+}
+```
+
+```bash
+mor compile --target wechat --output-path dist/wx-custom
+```
+
+## Target-specific defaults
+
+Each target automatically sets appropriate compilation defaults:
+
+<CardGroup cols={2}>
+  <Card title="WeChat" icon="code">
+    - Module format: `CommonJS`
+    - Script target: `ES5`
+    - Templates: `.wxml`
+    - Styles: `.wxss`
+    - SJS files: `.wxs`
+  </Card>
+  <Card title="Alipay" icon="code">
+    - Module format: `ESNext`
+    - Script target: `ES2015`
+    - Templates: `.axml`
+    - Styles: `.acss`
+    - SJS files: `.sjs`
+  </Card>
+  <Card title="ByteDance" icon="code">
+    - Shares Alipay file conventions
+    - Global object: `tt`
+    - Output: `dist/bytedance`
+  </Card>
+  <Card title="Web" icon="globe">
+    - Alipay DSL as base
+    - Global object: `myPro`
+    - Produces a webpack bundle with HTML entry
+    - See the [Web Compilation guide](/guides/web-compilation)
+  </Card>
+</CardGroup>
+
+## Conditional file extensions
+
+Each target also sets a default conditional file extension used for file-level conditional compilation:
+
+| Target | Default extension |
+|--------|-------------------|
+| `wechat` | `.wx` |
+| `alipay` | `.my` |
+| `baidu` | `.swan` |
+| `bytedance` | `.tt` |
+| `qq` | `.qq` |
+| `taobao` | `.tb` |
+| `dingding` | `.dd` |
+| `web` | `.web` |
+
+When a file like `index.wx.ts` exists alongside `index.ts`, MorJS prefers `index.wx.ts` when compiling to the `wechat` target.

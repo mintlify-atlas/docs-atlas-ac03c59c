@@ -1,0 +1,212 @@
+---
+title: mor.config.ts
+description: Reference for the MorJS configuration file format, export styles, and top-level fields.
+---
+
+MorJS reads configuration from `mor.config.ts` (or `.js`, `.mjs`, `.json`, `.jsonc`, `.json5`) in your project root. Use `defineConfig` from `@morjs/cli` to get full TypeScript type checking.
+
+## File format
+
+<CodeGroup>
+
+```typescript Single config (TypeScript)
+import { defineConfig } from '@morjs/cli'
+
+export default defineConfig({
+  name: 'my-app',
+  sourceType: 'wechat',
+  target: 'wechat',
+  compileMode: 'bundle'
+})
+```
+
+```typescript Multiple configs (TypeScript)
+import { defineConfig } from '@morjs/cli'
+
+export default defineConfig([
+  {
+    name: 'wechat',
+    sourceType: 'wechat',
+    target: 'wechat',
+    compileMode: 'bundle'
+  },
+  {
+    name: 'alipay',
+    sourceType: 'wechat',
+    target: 'alipay',
+    compileMode: 'bundle'
+  },
+  {
+    name: 'web',
+    sourceType: 'wechat',
+    target: 'web',
+    compileMode: 'bundle'
+  }
+])
+```
+
+```typescript Async function
+import { defineConfig } from '@morjs/cli'
+
+export default defineConfig(async () => {
+  const target = process.env.TARGET || 'wechat'
+  return {
+    name: target,
+    sourceType: 'wechat',
+    target,
+    compileMode: 'bundle'
+  }
+})
+```
+
+```json JSON format (mor.config.json)
+{
+  "name": "my-app",
+  "sourceType": "wechat",
+  "target": "wechat",
+  "compileMode": "bundle"
+}
+```
+
+</CodeGroup>
+
+## Supported config file names
+
+MorJS looks for these files in your project root, in order:
+
+- `mor.config.ts`
+- `mor.config.mjs`
+- `mor.config.js`
+- `mor.config.json`
+- `mor.config.jsonc`
+- `mor.config.json5`
+
+You can also add a `mor` field to your `package.json`:
+
+```json package.json
+{
+  "name": "my-app",
+  "mor": {
+    "sourceType": "wechat",
+    "target": "wechat"
+  }
+}
+```
+
+## Multiple configs and the `name` field
+
+When you export an array of configs, each config is identified by its `name` field. You can run a specific named config using the `--name` flag (or `--config` alias):
+
+```bash
+mor compile --name wechat
+mor compile --name alipay
+```
+
+<Tip>
+  The `name` field must be unique across configs. Use descriptive names that match your target platform or build variant.
+</Tip>
+
+## Top-level fields
+
+<ParamField path="name" type="string">
+  A unique identifier for this config entry. Required when exporting an array of configs. Used to filter configs via the `--name` CLI flag.
+</ParamField>
+
+<ParamField path="sourceType" type="string" default="wechat">
+  The DSL your source code uses. MorJS auto-detects this from `.wxml` or `.axml` file extensions in most cases. Set explicitly when both file types coexist in the same directory.
+
+  Accepted values: `wechat`, `alipay`
+</ParamField>
+
+<ParamField path="target" type="string">
+  The platform to compile to. Defaults to the first available target. Each target has a default output directory under `dist/`.
+
+  Accepted values: `wechat`, `alipay`, `baidu`, `bytedance`, `qq`, `kuaishou`, `taobao`, `dingding`, `web`
+</ParamField>
+
+<ParamField path="compileMode" type="string" default="bundle">
+  How modules and dependencies are processed. `bundle` resolves and inlines npm packages. `transform` converts source files only without processing dependencies.
+
+  Accepted values: `bundle`, `transform`
+</ParamField>
+
+<ParamField path="compileType" type="string" default="miniprogram">
+  The artifact type. Determines which entry file is used.
+
+  Accepted values: `miniprogram`, `plugin`, `subpackage`, `component`
+</ParamField>
+
+<ParamField path="srcPath" type="string" default="./src">
+  Root directory of your source code.
+</ParamField>
+
+<ParamField path="outputPath" type="string">
+  Output directory. Defaults to `dist/<target>` if not set.
+</ParamField>
+
+<ParamField path="mode" type="string" default="development">
+  Build mode. Mirrors webpack's `mode` option. Affects defaults for caching, minification, and source maps.
+
+  Accepted values: `production`, `development`, `none`
+</ParamField>
+
+<ParamField path="plugins" type="array">
+  List of MorJS plugins to apply. Each entry can be a plugin class instance, a package name string, or a `[name, options]` tuple.
+
+  ```typescript
+  plugins: [
+    'my-plugin-package',
+    ['another-plugin', { option: true }],
+    new MyPlugin()
+  ]
+  ```
+</ParamField>
+
+<ParamField path="watch" type="boolean" default="false">
+  Enable file watch mode.
+</ParamField>
+
+<ParamField path="autoClean" type="boolean" default="false">
+  Delete the output directory before each build.
+</ParamField>
+
+<ParamField path="cache" type="boolean">
+  Enable build caching. Defaults to `true` in development mode and `false` in production mode.
+</ParamField>
+
+<ParamField path="ignore" type="string[]" default="[]">
+  Paths to exclude from compilation. Output directories are added automatically.
+</ParamField>
+
+## Environment variables
+
+MorJS loads `.env` files automatically. You can use different files per environment:
+
+- `.env` — loaded in all cases
+- `.env.local` — loaded in all cases, gitignored
+- `.env.development` — loaded when `mode` is `development`
+- `.env.production` — loaded when `mode` is `production`
+
+## Full config type
+
+The `UserConfig` type exported from `@morjs/cli` combines all config areas:
+
+```typescript
+import type { UserConfig } from '@morjs/cli'
+```
+
+It includes fields from:
+- Core takin fields (`name`, `plugins`, etc.)
+- Compiler options (`sourceType`, `target`, `compileMode`, etc.)
+- Compose options (`compose`, `host`, `modules`, etc.)
+- Web-specific options (`web.*`)
+- webpack passthrough options (`externals`, etc.)
+
+<Columns cols={2}>
+  <Card title="Compiler options →" icon="hammer" href="/api/config/compiler-options">
+    All fields for controlling how source is compiled: minification, aliases, defines, and more.
+  </Card>
+  <Card title="Web options →" icon="globe" href="/api/config/web-options">
+    Web-specific configuration for rpx conversion, routing, dev server, and HTML output.
+  </Card>
+</Columns>

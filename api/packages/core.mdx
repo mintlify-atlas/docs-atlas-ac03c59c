@@ -1,0 +1,125 @@
+---
+title: "@morjs/core"
+description: "The MorJS runtime core package. Provides App, Page, and Component registration functions with lifecycle hooks, mixins, cross-platform adapters, and plugin support."
+---
+
+## Overview
+
+`@morjs/core` is the runtime foundation of every MorJS mini-program. It wraps the native `App()`, `Page()`, and `Component()` constructors with a unified hook and adapter system so that plugins and cross-platform logic can intercept every lifecycle event.
+
+| Property | Value |
+|---|---|
+| **Package** | `@morjs/core` |
+| **Version** | `1.0.86` |
+| **License** | ISC |
+| **Node** | `>= 12.13.0` |
+| **Module formats** | CommonJS (`lib/`), ES modules (`esm/`) |
+
+## Installation
+
+```bash
+npm install @morjs/core
+```
+
+## Exports
+
+All public symbols exported from `@morjs/core`:
+
+### App
+
+| Export | Type | Description |
+|---|---|---|
+| `createApp` | `function` | Register an app with the MorJS runtime |
+| `aApp` | `function` | Alias of `createApp` for Alipay DSL |
+| `wApp` | `function` | Alias of `createApp` for WeChat DSL |
+| `registerAppAdapters` | `function` | Register app-level platform adapters |
+| `MorAppInstance` | `interface` | Shape of the extended app instance (`$morHooks`, `$event`, `$context`, `$morPluginsNames`) |
+| `GetAppFunction` | `type` | Extended `getApp` return type |
+
+### Page
+
+| Export | Type | Description |
+|---|---|---|
+| `createPage` | `function` | Register a page with the MorJS runtime |
+| `aPage` | `function` | Alipay-style page registration |
+| `wPage` | `function` | WeChat-style page registration |
+| `enhancePage` | `function` | Apply MorJS enhancements without registering |
+| `registerPageAdapters` | `function` | Register page-level platform adapters |
+| `MorPageAdapter` | `interface` | Page adapter interface |
+
+### Component
+
+| Export | Type | Description |
+|---|---|---|
+| `createComponent` | `function` | Register a component with the MorJS runtime |
+| `aComponent` | `function` | Alipay-style component registration |
+| `wComponent` | `function` | WeChat-style component registration |
+| `enhanceComponent` | `function` | Apply MorJS enhancements without registering |
+| `registerComponentAdapters` | `function` | Register component-level platform adapters |
+| `MorComponentAdapter` | `interface` | Component adapter interface |
+
+### Plugin & utilities
+
+| Export | Type | Description |
+|---|---|---|
+| `createPlugin` | `function` | Create a mini-program plugin object |
+| `aPlugin` | `function` | Alias of `createPlugin` for Alipay |
+| `wPlugin` | `function` | Alias of `createPlugin` for WeChat |
+| `PageToComponent` | `function` | Convert page options to component options |
+| `aPageToComponent` | `function` | Alipay-style `PageToComponent` |
+| `wPageToComponent` | `function` | WeChat-style `PageToComponent` |
+| `init` | `function` | Initialise the MorJS runtime (hooks + plugins) |
+
+## Quick start
+
+<CodeGroup>
+```ts app.ts
+import { createApp } from '@morjs/core'
+
+createApp({
+  globalData: {},
+  onLaunch(options) {
+    console.log('launch', options)
+  }
+})
+```
+
+```ts page.ts
+import { aPage } from '@morjs/core'
+
+aPage({
+  data: { title: 'Hello MorJS' },
+  onLoad() {
+    this.setData({ title: 'Loaded' })
+  }
+})
+```
+
+```ts component.ts
+import { aComponent } from '@morjs/core'
+
+aComponent({
+  props: { label: '' },
+  data: { visible: false },
+  methods: {
+    show() { this.setData({ visible: true }) }
+  }
+})
+```
+</CodeGroup>
+
+## Peer dependencies
+
+| Package | Version |
+|---|---|
+| `@morjs/api` | `1.0.69` |
+| `mini-types` | `^0.1.7` |
+| `miniprogram-api-typings` | `^3.4.4` |
+| `tslib` | `^2.3.1` |
+
+## See also
+
+- [App API reference](/api/runtime/app)
+- [Page API reference](/api/runtime/page)
+- [Component API reference](/api/runtime/component)
+- [Plugin API reference](/api/runtime/plugin)

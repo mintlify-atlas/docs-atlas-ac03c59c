@@ -1,0 +1,92 @@
+---
+title: "Multi-platform compilation"
+description: "How MorJS compiles a single source tree to multiple mini-program platforms simultaneously."
+---
+
+MorJS treats platform targets as first-class compilation outputs. You write your mini-program once using either the WeChat or Alipay DSL, then tell MorJS which targets to produce. Each target is an independent, runnable output directory.
+
+## Supported targets
+
+The `target` field in your MorJS configuration selects the output platform. The following targets ship with MorJS out of the box:
+
+| Target | Platform | Global object | Default output dir |
+|--------|----------|---------------|--------------------|
+| `alipay` | Alipay mini-program (支付宝小程序) | `my` | `dist/alipay` |
+| `wechat` | WeChat mini-program (微信小程序) | `wx` | `dist/wechat` |
+| `baidu` | Baidu smart mini-program (百度小程序) | `swan` | `dist/baidu` |
+| `bytedance` | ByteDance mini-program — Douyin (字节小程序) | `tt` | `dist/bytedance` |
+| `qq` | QQ mini-program (QQ 小程序) | `qq` | `dist/qq` |
+| `taobao` | Taobao mini-program (淘宝小程序) | — | `dist/taobao` |
+| `dingding` | DingTalk mini-program (钉钉小程序) | — | `dist/dingding` |
+| `kuaishou` | Kuaishou mini-program (快手小程序) | — | `dist/kuaishou` |
+| `web` | Web application (H5) | `my` | `dist/web` |
+
+The targets `web-pro` and `weex-pro` are available as extended targets for advanced use cases.
+
+## One source, many outputs
+
+A typical MorJS workflow compiles the same source directory to multiple targets by running the compiler once per target:
+
+```bash
+# Compile to Alipay
+mor compile --target alipay
+
+# Compile to WeChat
+mor compile --target wechat
+
+# Compile to web
+mor compile --target web
+```
+
+Each invocation reads from `src/` (or the configured `srcPath`) and writes to the target's default output directory.
+
+To set the target in configuration instead of on the command line, use `mor.config.ts`:
+
+```typescript
+import { defineConfig } from '@morjs/core'
+
+export default defineConfig([
+  {
+    name: 'alipay',
+    target: 'alipay',
+    sourceType: 'wechat',
+  },
+  {
+    name: 'wechat',
+    target: 'wechat',
+    sourceType: 'wechat',
+  }
+])
+```
+
+## Compile-time vs runtime platform handling
+
+MorJS handles platform differences in two complementary layers:
+
+<CardGroup cols={2}>
+  <Card title="Compile-time" icon="gear">
+    The compiler rewrites template directives, file extensions, and global object references during the build. For example, `wx:if` becomes `a:if` when targeting Alipay. No runtime cost.
+  </Card>
+  <Card title="Runtime" icon="bolt">
+    The runtime layer normalizes API behavior and component lifecycle differences at run time. This covers cases that cannot be handled statically, such as API response shape differences.
+  </Card>
+</CardGroup>
+
+The `autoInjectRuntime` configuration controls which runtime adapters are injected at compile time. See [Runtime](/concepts/runtime) for details.
+
+## Conditional compilation by target
+
+You can write target-specific code inline using conditional compile context variables, or use file-extension-based conditional compilation. Each target defines a `defaultConditionalFileExt`:
+
+| Target | File extension suffix |
+|--------|-----------------------|
+| `alipay` | `.my` |
+| `wechat` | `.wx` |
+| `baidu` | `.bd` |
+| `web` | `.web` |
+
+For example, `button.my.ts` is only included in Alipay builds; `button.wx.ts` is only included in WeChat builds. A plain `button.ts` is the fallback used for all other targets.
+
+<Note>
+Setting `outputPath` explicitly in your config overrides the default output directory for that target configuration entry.
+</Note>

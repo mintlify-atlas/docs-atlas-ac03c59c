@@ -1,0 +1,397 @@
+---
+title: Compiler options
+description: Complete reference for all compiler configuration fields available in mor.config.ts, sourced from CompilerUserConfigSchema.
+---
+
+These options control how MorJS compiles your mini-program source. All fields are set at the top level of your `mor.config.ts` config object (or within each array entry for multi-config exports).
+
+## Source and target
+
+<ParamField path="sourceType" type="string" default="wechat">
+  The DSL used in your source files. MorJS auto-detects this by looking for `.wxml` (WeChat) or `.axml` (Alipay) template files. Only set this explicitly when both types of files exist in the same directory.
+
+  Accepted values: `wechat`, `alipay`
+</ParamField>
+
+<ParamField path="target" type="string">
+  The platform target for the compiled output. Defaults to the first registered target. Each target has a default output path under `dist/`.
+
+  Accepted values: `wechat`, `alipay`, `baidu`, `bytedance`, `qq`, `kuaishou`, `taobao`, `dingding`, `web`
+</ParamField>
+
+<ParamField path="compileMode" type="string" default="bundle">
+  Compilation strategy.
+
+  - `bundle` — Full webpack bundling with npm package resolution. Produces a self-contained output with no `node_modules`.
+  - `transform` — Source-only conversion. Dependencies are not bundled; useful for component library authors.
+
+  Accepted values: `bundle`, `transform`
+</ParamField>
+
+<ParamField path="compileType" type="string" default="miniprogram">
+  The type of artifact to produce. Determines the root entry config file.
+
+  | Value | Entry file |
+  |-------|------------|
+  | `miniprogram` | `app.json` |
+  | `plugin` | `plugin.json` |
+  | `subpackage` | `subpackage.json` |
+  | `component` | `component.json` |
+
+  Accepted values: `miniprogram`, `plugin`, `subpackage`, `component`
+</ParamField>
+
+## Paths
+
+<ParamField path="srcPath" type="string" default="./src">
+  Root directory of your source files.
+</ParamField>
+
+<ParamField path="srcPaths" type="string[]">
+  Additional source root directories. Useful when source files are spread across multiple directories.
+</ParamField>
+
+<ParamField path="outputPath" type="string">
+  Directory where compiled output is written. Defaults to `dist/<target>` when not set.
+</ParamField>
+
+<ParamField path="ignore" type="string[]" default="[]">
+  Files and directories to exclude from compilation. All `outputPath` values are added to this list automatically.
+</ParamField>
+
+## Build mode
+
+<ParamField path="mode" type="string" default="development">
+  Build mode. Mirrors webpack's `mode` option. Affects tree-shaking, optimization, and source map defaults.
+
+  Accepted values: `production`, `development`, `none`
+</ParamField>
+
+<ParamField path="watch" type="boolean" default="false">
+  Enable file watch mode. MorJS rebuilds affected files when changes are detected.
+</ParamField>
+
+<ParamField path="autoClean" type="boolean" default="false">
+  Delete the output directory before each build.
+</ParamField>
+
+<ParamField path="cache" type="boolean">
+  Enable the webpack filesystem cache. Defaults to `true` in `development` mode and `false` in `production` mode.
+</ParamField>
+
+## Minification
+
+<ParamField path="minimize" type="boolean">
+  Enable output minification. Automatically set to `true` when `mode` is `production`.
+</ParamField>
+
+<ParamField path="jsMinimizer" type="string | boolean" default="true">
+  JavaScript minimizer to use when `minimize` is enabled.
+
+  Accepted values: `terser`, `esbuild`, `swc`, `true` (use default), `false` (disable JS minification)
+</ParamField>
+
+<ParamField path="jsMinimizerOptions" type="object">
+  Options passed directly to the chosen JS minimizer. The shape depends on which minimizer is selected.
+</ParamField>
+
+<ParamField path="cssMinimizer" type="string | boolean" default="esbuild">
+  CSS minimizer to use when `minimize` is enabled.
+
+  Accepted values: `esbuild`, `csso`, `cssnano`, `cleancss`, `parcelcss`, `false` (disable CSS minification)
+</ParamField>
+
+<ParamField path="cssMinimizerOptions" type="object">
+  Options passed directly to the chosen CSS minimizer.
+</ParamField>
+
+<ParamField path="xmlMinimizer" type="boolean">
+  Enable template (WXML/AXML) minification using `html-terser`.
+</ParamField>
+
+<ParamField path="xmlMinimizerOptions" type="object">
+  Options passed to the XML minimizer.
+</ParamField>
+
+## Source maps
+
+<ParamField path="devtool" type="string | boolean">
+  Source map generation strategy. Accepts any [webpack devtool](https://webpack.js.org/configuration/devtool/) string value (for example, `source-map`, `eval-cheap-source-map`), or `false` to disable source maps entirely.
+</ParamField>
+
+## Aliases and defines
+
+<ParamField path="alias" type="Record<string, any>" default="{}">
+  Module path aliases. These are passed to webpack's `resolve.alias` option.
+
+  ```typescript
+  alias: {
+    '@utils': './src/utils',
+    '@components': './src/components'
+  }
+  ```
+</ParamField>
+
+<ParamField path="define" type="Record<string, any>" default="{}">
+  Global constants to inject into source code at compile time. Only effective in `bundle` mode.
+
+  ```typescript
+  define: {
+    __VERSION__: JSON.stringify('1.0.0'),
+    __DEV__: JSON.stringify(true)
+  }
+  ```
+</ParamField>
+
+## File copying
+
+<ParamField path="copy" type="array">
+  Files or directories to copy from source to output. Entries can be plain strings (file path relative to `srcPath`) or objects:
+
+  ```typescript
+  copy: [
+    'static/images',
+    {
+      from: 'assets/fonts',
+      to: 'fonts',
+      force: true
+    }
+  ]
+  ```
+
+  Object fields:
+  - `from` (string) — Source path relative to `srcPath` or `srcPaths`.
+  - `to` (string) — Destination path relative to `outputPath`.
+  - `context` (string) — Optional base directory override.
+  - `force` (boolean) — Overwrite existing files.
+  - `toType` (string) — `'file'` or `'dir'`.
+  - `priority` (number) — Copy order priority.
+  - `globOptions` (object) — Glob matching options.
+  - `filter` (function) — Custom filter `(filePath: string) => boolean`.
+</ParamField>
+
+## Node modules processing
+
+<ParamField path="processNodeModules" type="boolean | object">
+  Whether to cross-compile components inside `node_modules`. By default, MorJS chooses automatically based on the target platform.
+
+  Pass `true` to process all node_modules, or an object for fine-grained control:
+
+  ```typescript
+  processNodeModules: {
+    include: [/my-component-lib/],
+    exclude: [/exclude-this-lib/]
+  }
+  ```
+</ParamField>
+
+<ParamField path="globalObject" type="string">
+  Override the global object name for the target platform (`wx` for WeChat, `my` for Alipay, etc.). Each target sets a sensible default; rarely needs to be overridden.
+</ParamField>
+
+## Runtime injection
+
+<ParamField path="autoInjectRuntime" type="boolean | object" default="true">
+  Automatically inject MorJS runtime wrappers at compile time. When `true`, all injection types are enabled based on platform defaults. When `false`, no runtime injection occurs.
+
+  Use an object for granular control:
+
+  ```typescript
+  autoInjectRuntime: {
+    app: true,        // wrap App({})
+    page: true,       // wrap Page({})
+    component: true,  // wrap Component({})
+    behavior: true,   // wrap Behavior({})
+    mixin: true,      // wrap Mixin({}) (Alipay source only)
+    api: 'enhanced'   // global object replacement strategy
+  }
+  ```
+
+  `api` accepted values: `enhanced` (replace global object + inject mor API shim), `lite` (simple global rename), `minimal` (replace function calls only), `false` (disable).
+</ParamField>
+
+## TypeScript compiler options
+
+<ParamField path="compilerOptions" type="object" default="{}">
+  TypeScript compilation settings. These mirror standard `tsconfig.json` options.
+
+  <Expandable title="fields" defaultOpen={true}>
+    <ResponseField name="declaration" type="boolean" default="false">
+      Emit `.d.ts` declaration files. Only supported in `transform` compile mode.
+    </ResponseField>
+    <ResponseField name="importHelpers" type="boolean">
+      Import TypeScript helpers from `tslib` instead of inlining them. Requires `tslib` in your dependencies.
+    </ResponseField>
+    <ResponseField name="module" type="string">
+      JavaScript module output format. Different targets use different defaults. Accepted values mirror `tsconfig` `module` options.
+    </ResponseField>
+    <ResponseField name="target" type="string">
+      ECMAScript output version. Different targets use different defaults. Accepted values mirror `tsconfig` `target` options.
+    </ResponseField>
+    <ResponseField name="esModuleInterop" type="boolean">
+      Enable ES module interoperability helpers for CommonJS imports.
+    </ResponseField>
+    <ResponseField name="allowSyntheticDefaultImports" type="boolean">
+      Allow default imports from modules that do not have a default export.
+    </ResponseField>
+    <ResponseField name="autoCorrectModuleKind" type="boolean">
+      Automatically correct module/import mismatches when `importHelpers` is enabled and the module format is not CommonJS.
+    </ResponseField>
+  </Expandable>
+</ParamField>
+
+## Conditional compilation
+
+<ParamField path="conditionalCompile" type="object" default="{}">
+  Configure compile-time conditional code inclusion.
+
+  <Expandable title="fields" defaultOpen={true}>
+    <ResponseField name="context" type="Record<string, any>" default="{}">
+      Key-value pairs available in conditional compile expressions within source code.
+    </ResponseField>
+    <ResponseField name="fileExt" type="string | string[]">
+      File extension suffix for platform-specific file selection. Each target sets a default (for example, `.web` for the web target).
+    </ResponseField>
+  </Expandable>
+</ParamField>
+
+## Custom entries
+
+<ParamField path="customEntries" type="object">
+  Override or extend the entry configuration. Useful when your entry config file is in a non-standard location, or when you need to compile extra pages or components that have no reference in `app.json`.
+
+  ```typescript
+  customEntries: {
+    'app.json': './custom-app.json',
+    pages: ['extra/page/index'],
+    components: ['shared/button/index']
+  }
+  ```
+
+  <Expandable title="fields">
+    <ResponseField name="app.json" type="string">
+      Custom path to the mini-program entry config.
+    </ResponseField>
+    <ResponseField name="subpackage.json" type="string">
+      Custom path to the subpackage entry config.
+    </ResponseField>
+    <ResponseField name="plugin.json" type="string">
+      Custom path to the plugin entry config.
+    </ResponseField>
+    <ResponseField name="component.json" type="string">
+      Custom path to the component entry config.
+    </ResponseField>
+    <ResponseField name="pages" type="string[]">
+      Extra pages to compile even if not referenced in `app.json`.
+    </ResponseField>
+    <ResponseField name="components" type="string[]">
+      Extra components to compile even if not referenced anywhere.
+    </ResponseField>
+  </Expandable>
+</ParamField>
+
+## Phantom dependency detection
+
+<ParamField path="phantomDependency" type="boolean | object" default="false">
+  Detect imports of packages that are not declared in `package.json`. Pass `true` to enable with default settings, or an object for configuration:
+
+  ```typescript
+  phantomDependency: {
+    mode: 'warn',     // 'warn' | 'error'
+    exclude: ['lodash', 'moment']  // packages to allow without declaration
+  }
+  ```
+
+  - `mode: 'warn'` — Log a warning for each phantom dependency.
+  - `mode: 'error'` — Throw an error and fail the build.
+</ParamField>
+
+## Module sharing (subpackage federation)
+
+<ParamField path="shared" type="Array<string | Record<string, string>>" default="[]">
+  Declare `node_modules` packages to expose for consumption by other configs in a multi-repo subpackage setup.
+
+  ```typescript
+  shared: ['react', '@my-org/common-utils']
+  ```
+</ParamField>
+
+<ParamField path="consumes" type="Array<string | Record<string, string>>" default="[]">
+  Declare `node_modules` packages to consume from a shared host instead of bundling locally.
+
+  ```typescript
+  consumes: ['react', '@my-org/common-utils']
+  ```
+</ParamField>
+
+## App JSON script generation
+
+<ParamField path="generateAppJSONScript" type="boolean" default="true">
+  Generate a `mor.p.js` script file used to update `app.json` content during integration. Disable this if you manage integration separately.
+</ParamField>
+
+## Bundle analysis
+
+<ParamField path="analyzer" type="boolean | object">
+  Enable bundle analysis with `webpack-bundle-analyzer`. Pass `true` to use defaults, or an object to configure:
+
+  ```typescript
+  analyzer: {
+    analyzerMode: 'server',    // 'server' | 'static' | 'json' | 'disabled'
+    analyzerHost: '127.0.0.1',
+    analyzerPort: 8888,
+    reportFilename: 'report.html',
+    defaultSizes: 'parsed',    // 'stat' | 'parsed' | 'gzip'
+    openAnalyzer: true,
+    generateStatsFile: false,
+    statsFilename: 'stats.json',
+    logLevel: 'info'           // 'info' | 'warn' | 'error' | 'silent'
+  }
+  ```
+</ParamField>
+
+## Experimental features
+
+<ParamField path="experiments" type="object">
+  Opt-in experimental features. These may change between minor versions.
+
+  <Expandable title="fields" defaultOpen={true}>
+    <ResponseField name="autoTrimRuntimeHelpers" type="boolean" default="false">
+      Automatically remove redundant TypeScript and Babel helper functions. Requires `tslib` and `@babel/runtime` in your project dependencies.
+    </ResponseField>
+    <ResponseField name="compressCssClassName" type="boolean | object" default="false">
+      Compress CSS class names to short random identifiers to reduce output size.
+
+      Pass `true` to enable with defaults, or configure with an object:
+
+      ```typescript
+      compressCssClassName: {
+        strategy: 'lite',  // currently only 'lite' is supported
+        prefix: '',        // prefix added to each compressed class name
+        surfix: '',        // suffix added to each compressed class name
+        include: [],       // RegExp[] — files to include
+        exclude: [],       // RegExp[] — files to exclude
+        except: [],        // class names that must not be renamed
+        alphabet: '_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789',
+        customAttributeNames: [],  // additional HTML attributes treated as class names
+        classNameFilter: (className, filePath) => true,  // custom filter function
+        disableDynamicClassDetection: false  // skip detection of dynamic class bindings
+      }
+      ```
+
+      <Warning>
+        In `lite` mode, `app.acss` and templates containing `{{}}` dynamic expressions and their corresponding style files are excluded from compression automatically.
+      </Warning>
+    </ResponseField>
+  </Expandable>
+</ParamField>
+
+## webpack passthrough
+
+<ParamField path="externals" type="any">
+  Passed directly to webpack's `externals` configuration. Use to exclude specific packages from the bundle.
+</ParamField>
+
+<ParamField path="externalsType" type="string">
+  Sets the default external type. Defaults vary by target; for web targets you may need to set this to `'window'`.
+</ParamField>

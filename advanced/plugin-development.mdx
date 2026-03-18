@@ -1,0 +1,183 @@
+---
+title: 'Plugin development'
+description: 'Build custom MorJS plugins to extend runner behavior through lifecycle hooks.'
+---
+
+MorJS plugins are plain objects (or class instances) that implement the `Plugin` interface from the `takin` engine. Each plugin receives a `Runner` instance in its `apply` method and taps into lifecycle hooks to intervene at any stage of the build.
+
+## Plugin interface
+
+The full `Plugin` interface is defined in `packages/takin/src/plugin.ts`:
+
+```typescript
+export interface Plugin {
+  /** Plugin name — required, used for deduplication and debug output. */
+  name: string
+
+  /** Optional semver version string. */
+  version?: string
+
+  /**
+   * Execution order relative to other plugins:
+   * - `'pre'`  — runs before normal plugins and before takin.use() plugins
+   * - `'post'` — runs after all normal plugins
+   * - `undefined` — normal order
+   */
+  enforce?: 'pre' | 'post'
+
+  /**
+   * Called once when the plugin is loaded via takin.use().
+   * Receives the Takin instance, useful for registering takin-level hooks.
+   */
+  onUse?: (takin: Takin) => void
+
+  /**
+   * Main plugin entry point. Receives the Runner for the current command.
+   * Use runner.hooks to tap into lifecycle stages.
+   */
+  apply: (runner: Runner) => void
+}
+```
+
+## Execution order
+
+Plugins are sorted into four groups before `apply` is called:
+
+| Order | Condition |
+|---|---|
+| 1 | `enforce: 'pre'` |
+| 2 | Plugins registered via `takin.use()` |
+| 3 | Normal plugins (no `enforce`) |
+| 4 | `enforce: 'post'` |
+
+Within each group, plugins run in registration order.
+
+## Available runner hooks
+
+All hooks are created in `packages/takin/src/runner/hooks.ts`. The `runner.hooks` object exposes:
+
+| Hook | Type | Description |
+|---|---|---|
+| `initialize` | `SyncHook<Runner>` | Called after the runner is initialized and plugins are loaded. |
+| `cli` | `SyncHook<Cli>` | Called when the CLI command tree is being built. Register sub-commands here. |
+| `matchedCommand` | `AsyncSeriesHook<CommandOptions>` | Called after the matched CLI command is resolved. |
+| `loadConfig` | `AsyncSeriesHook<CommandOptions>` | Called during config file loading. |
+| `modifyUserConfig` | `AsyncSeriesWaterfallHook<[UserConfig, CommandOptions]>` | Modify user config before validation. |
+| `registerUserConfig` | `AsyncSeriesWaterfallHook<[AnyZodObject, Zod]>` | Extend the config validation schema. |
+| `shouldRun` | `SyncBailHook<Runner, boolean>` | Return `false` to stop runner execution. |
+| `shouldValidateUserConfig` | `SyncBailHook<Runner, boolean>` | Return `false` to skip config validation. |
+| `userConfigValidated` | `AsyncSeriesHook<UserConfig>` | Called after config is validated; safe to read the final config. |
+| `beforeRun` | `AsyncSeriesHook<Runner>` | Called just before the command action runs. |
+| `run` | `HookMap<AsyncParallelHook<CommandOptions>>` | The command action itself (keyed by `command:<name>`). |
+| `done` | `AsyncParallelHook<Runner>` | Called after the command completes successfully. |
+| `failed` | `AsyncSeriesHook<Error>` | Called when the runner throws an error. |
+| `shutdown` | `AsyncSeriesHook<Runner>` | Called when the runner is shut down (e.g., during reload). |
+
+<Note>
+  Compiler-specific hooks (such as `webpackWrapper`, `scriptParser`, `templateParser`, `styleParser`, `afterBuildEntries`, and `compiler`) are added by `@morjs/plugin-compiler` and are only available inside a compile command runner.
+</Note>
+
+## Full working example
+
+The following plugin logs the final user config and injects a custom `define` variable:
+
+```typescript
+// plugins/my-plugin.ts
+import type { Plugin, Runner } from '@morjs/utils'
+
+export class MyPlugin implements Plugin {
+  name = 'MyPlugin'
+  version = '1.0.0'
+
+  onUse(takin) {
+    // Called once when takin.use([new MyPlugin()]) is invoked.
+    // Useful for registering takin-level hooks.
+    takin.hooks.initialize.tapPromise(this.name, async (t) => {
+      t.logger?.debug('Takin initialized')
+    })
+  }
+
+  apply(runner: Runner) {
+    // Inject a build-time constant into the bundle.
+    runner.hooks.modifyUserConfig.tapPromise(
+      this.name,
+      async (userConfig) => {
+        userConfig.define = {
+          ...userConfig.define,
+          __MY_FLAG__: JSON.stringify(true)
+        }
+        return userConfig
+      }
+    )
+
+    // Log the validated config.
+    runner.hooks.userConfigValidated.tapPromise(
+      this.name,
+      async (userConfig) => {
+        runner.logger.info(`Target: ${userConfig.target}`)
+      }
+    )
+
+    // Clean up on shutdown.
+    runner.hooks.shutdown.tapPromise(this.name, async () => {
+      runner.logger.info('MyPlugin shutting down')
+    })
+  }
+}
+```
+
+## Registering plugins in mor.config.ts
+
+Add your plugin to the `plugins` array in `mor.config.ts`. MorJS accepts a plugin instance, a `[plugin, options]` tuple, or a factory function:
+
+```typescript
+// mor.config.ts
+import { defineConfig } from '@morjs/cli'
+import { MyPlugin } from './plugins/my-plugin'
+
+export default defineConfig([
+  {
+    name: 'alipay',
+    target: 'alipay',
+    plugins: [
+      // Instance
+      new MyPlugin(),
+
+      // Factory function (called with no arguments)
+      () => new MyPlugin()
+    ]
+  }
+])
+```
+
+## Using takin.use() programmatically
+
+When you create a `Takin` instance directly (for example, in a custom CLI script), call `takin.use()` before `takin.run()`:
+
+```typescript
+import { Takin } from '@morjs/utils'
+import { MyPlugin } from './plugins/my-plugin'
+
+const takin = new Takin('my-app')
+
+// use() accepts an array of Plugin instances or [Plugin, options] tuples.
+takin.use([new MyPlugin()])
+
+await takin.run()
+```
+
+`takin.use()` triggers the plugin's `onUse` callback immediately, passing the `Takin` instance. The `apply` method is called later, once per `Runner` that runs during `takin.run()`.
+
+## Sharing methods between plugins
+
+Plugins can share functions via `runner.methods`:
+
+```typescript
+// Register a method from one plugin
+runner.methods.register('getManifest', () => manifest)
+
+// Invoke it from another plugin
+const manifest = runner.methods.invoke('getManifest')
+```
+
+Methods are scoped to a single runner instance and cleared when the runner shuts down.

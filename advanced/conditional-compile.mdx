@@ -1,0 +1,180 @@
+---
+title: 'Conditional compilation'
+description: 'Use code-level and file-level conditional compilation to write platform-specific branches in a single codebase.'
+---
+
+MorJS supports two forms of conditional compilation:
+
+- **Code-level** — remove or keep blocks of code based on variables in `conditionalCompile.context`.
+- **File-level** — resolve platform-specific file variants based on `conditionalCompile.fileExt`.
+
+## Configuration
+
+Both options live under `conditionalCompile` in `mor.config.ts`:
+
+```typescript
+export default defineConfig([
+  {
+    target: 'alipay',
+    conditionalCompile: {
+      // Variables available inside conditional compile directives
+      context: {
+        MY_PLATFORM: 'alipay',
+        IS_PROD: process.env.NODE_ENV === 'production'
+      },
+      // File extension suffix used to resolve platform-specific file variants
+      // Each target has a built-in default (see below)
+      fileExt: 'alipay'
+    }
+  }
+])
+```
+
+## Code-level conditional compilation
+
+`conditionalCompile.context` defines the variable set evaluated when the compiler encounters conditional compile directives in your source files.
+
+### Directives
+
+Directives are written as comments. The compiler strips the surrounding comment markers and evaluates the expression against the context:
+
+```javascript
+/* #if MY_PLATFORM === 'alipay' */
+my.showToast({ content: 'hello' })
+/* #elif MY_PLATFORM === 'wechat' */
+wx.showToast({ title: 'hello' })
+/* #else */
+console.log('hello')
+/* #endif */
+```
+
+```xml
+<!-- #if MY_PLATFORM === 'alipay' -->
+<view class="alipay-only">Alipay</view>
+<!-- #else -->
+<view class="other">Other</view>
+<!-- #endif -->
+```
+
+### Using built-in target context
+
+The compiler automatically injects the current `target` value as `TARGET` into the context. You can use it without any extra config:
+
+```javascript
+/* #if TARGET === 'wechat' */
+Page({
+  onLoad() {
+    wx.request({ url: '...' })
+  }
+})
+/* #else */
+Page({
+  onLoad() {
+    my.httpRequest({ url: '...' })
+  }
+})
+/* #endif */
+```
+
+### Adding custom context variables
+
+```typescript
+export default defineConfig([
+  {
+    target: 'alipay',
+    conditionalCompile: {
+      context: {
+        APP_VERSION: '2.1.0',
+        ENABLE_NEW_UI: true
+      }
+    }
+  }
+])
+```
+
+```javascript
+/* #if ENABLE_NEW_UI */
+import NewUI from './components/new-ui'
+/* #else */
+import OldUI from './components/old-ui'
+/* #endif */
+```
+
+## File-level conditional compilation
+
+`conditionalCompile.fileExt` controls file-extension-based resolution. When this option is set to `'alipay'`, MorJS resolves `button.alipay.ts` in preference to `button.ts` when compiling for Alipay.
+
+### Default fileExt values by target
+
+Each compiler target plugin declares a `defaultConditionalFileExt` property. You do not need to set `fileExt` unless you want to override the default:
+
+| Target | Default fileExt |
+|---|---|
+| `alipay` | `alipay` |
+| `wechat` | `wechat` |
+| `baidu` | `baidu` |
+| `bytedance` | `bytedance` |
+| `qq` | `qq` |
+| `taobao` | `taobao` |
+| `dingding` | `dingding` |
+| `web` | `web` |
+
+### Providing platform-specific file variants
+
+Create sibling files with the target extension as an additional suffix:
+
+```
+src/
+  utils/
+    platform.ts          # fallback for all targets
+    platform.alipay.ts   # used only when compiling for alipay
+    platform.wechat.ts   # used only when compiling for wechat
+```
+
+Import the file without the platform suffix — MorJS automatically resolves the correct variant at compile time:
+
+```typescript
+// This import resolves to platform.alipay.ts when target is 'alipay'
+import { getPlatformInfo } from './utils/platform'
+```
+
+### Multiple fileExt values
+
+Pass an array to check multiple extensions in priority order:
+
+```typescript
+conditionalCompile: {
+  fileExt: ['alipay', 'mini']
+}
+```
+
+With this config, MorJS checks for `platform.alipay.ts` first, then `platform.mini.ts`, and falls back to `platform.ts`.
+
+## Combining both forms
+
+Code-level and file-level compilation can be used together:
+
+```typescript
+export default defineConfig([
+  {
+    target: 'alipay',
+    conditionalCompile: {
+      context: {
+        PLATFORM: 'alipay',
+        IS_PROD: process.env.NODE_ENV === 'production'
+      },
+      fileExt: 'alipay'
+    }
+  },
+  {
+    target: 'wechat',
+    conditionalCompile: {
+      context: {
+        PLATFORM: 'wechat',
+        IS_PROD: process.env.NODE_ENV === 'production'
+      },
+      fileExt: 'wechat'
+    }
+  }
+])
+```

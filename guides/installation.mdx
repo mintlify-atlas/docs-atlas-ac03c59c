@@ -1,0 +1,112 @@
+---
+title: Installation
+description: Install MorJS and set up your development environment.
+---
+
+## Requirements
+
+MorJS requires **Node.js >= 12.13.0**. You can check your current version with:
+
+```bash
+node --version
+```
+
+## Install the CLI
+
+Install `@morjs/cli` globally to get the `mor` command available system-wide.
+
+<Tabs>
+  <Tab title="npm">
+    ```bash
+    npm install -g @morjs/cli
+    ```
+  </Tab>
+  <Tab title="yarn">
+    ```bash
+    yarn global add @morjs/cli
+    ```
+  </Tab>
+  <Tab title="pnpm">
+    ```bash
+    pnpm add -g @morjs/cli
+    ```
+  </Tab>
+</Tabs>
+
+## Verify installation
+
+```bash
+mor --version
+```
+
+You should see the installed version of `@morjs/cli` printed to the terminal.
+
+## Adding MorJS to an existing project
+
+If you already have a mini-program project, add the CLI and compiler as development dependencies:
+
+<Tabs>
+  <Tab title="npm">
+    ```bash
+    npm install --save-dev @morjs/cli @morjs/plugin-compiler
+    ```
+  </Tab>
+  <Tab title="yarn">
+    ```bash
+    yarn add --dev @morjs/cli @morjs/plugin-compiler
+    ```
+  </Tab>
+  <Tab title="pnpm">
+    ```bash
+    pnpm add -D @morjs/cli @morjs/plugin-compiler
+    ```
+  </Tab>
+</Tabs>
+
+Then invoke the CLI through your `package.json` scripts using `mor` directly:
+
+```json package.json
+{
+  "scripts": {
+    "dev": "mor compile -w",
+    "build": "mor compile"
+  }
+}
+```
+
+## Adding runtime support
+
+For cross-platform runtime APIs (App, Page, Component lifecycle bridging), add `@morjs/core`:
+
+<Tabs>
+  <Tab title="npm">
+    ```bash
+    npm install @morjs/core
+    ```
+  </Tab>
+  <Tab title="yarn">
+    ```bash
+    yarn add @morjs/core
+    ```
+  </Tab>
+  <Tab title="pnpm">
+    ```bash
+    pnpm add @morjs/core
+    ```
+  </Tab>
+</Tabs>
+
+<Note>
+  `@morjs/core` is a runtime dependency, not a dev dependency. It is required at runtime when `autoInjectRuntime` is enabled (the default for cross-platform compilation).
+</Note>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Project Setup" href="/guides/project-setup">
+    Scaffold a new project and understand the directory structure.
+  </Card>
+  <Card title="Configuration" href="/guides/configuration">
+    Learn how to configure `mor.config.ts` for your project.
+  </Card>
+</CardGroup>
